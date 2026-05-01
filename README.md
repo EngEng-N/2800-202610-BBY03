@@ -29,14 +29,22 @@ cd 2800-202610-BBY03
 
 ### 2. Run Frontend
 
+```bash
 cd frontend
 npm install
 npm run dev
+```
+
+Frontend runs on: http://localhost:5173
 
 ---
 
 ### 3. Run Backend
 
+```bash
 cd backend
 npm install
 npm run dev
+```
+
+Backend runs on: http://localhost:3000

@@ -1,5 +1,5 @@
 const express = require("express");
-const routes: { path: string; url: string }[] = require("./routes.json");
+const routes = require("./routes.json");
 
 const app: any = express();
 const PORT = process.env.PORT || 3000;
@@ -7,7 +7,9 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-for (const { path, url } of routes) {
+const openVancouver: { path: string, url: string }[] = routes.openVancouver;
+
+for (const { path, url } of openVancouver) {
   app.get(path, async (_req: any, res: any, next: any) => {
     try {
       const response = await fetch(url);

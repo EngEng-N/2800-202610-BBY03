@@ -19,22 +19,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
-
 # Editor
-.idea/
-*.swp
-*.swo
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
 
 # Caches
-.cache/
-.parcel-cache/
-.npm/
-.eslintcache
-coverage/
+.eslintcache/

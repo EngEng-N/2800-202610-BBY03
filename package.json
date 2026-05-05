@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "express": "^5.2.1",
+    "leaflet": "^1.9.4",
     "node": "^24.15.0"
   }
 }

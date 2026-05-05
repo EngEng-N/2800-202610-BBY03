@@ -9,7 +9,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // Routes
 app.get("/", (req, res) => {
-  res.send("Hello gang");
+  res.send("hello gang");
 });
 
 // Start server

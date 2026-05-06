@@ -1,5 +1,6 @@
 var map = L.map("map").setView([49.2789639460617, -123.122056018925], 13);
 const API_LIMIT = 100;
+const MIN_ZOOM = 17;
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution:
@@ -20,41 +21,79 @@ function createColoredMarker(color) {
   });
 }
 
+// --- Zoom hint overlay ---
+const zoomHint = L.control({ position: "topright" });
+zoomHint.onAdd = function () {
+  const div = L.DomUtil.create("div", "zoom-hint");
+  div.style.cssText =
+    "background:rgba(255,255,255,0.85);padding:8px 12px;border-radius:6px;font-size:13px;color:#333;box-shadow:0 1px 4px rgba(0,0,0,0.2);";
+  div.innerText = "Zoom in to see locations";
+  return div;
+};
+zoomHint.addTo(map);
+
+function updateZoomHint() {
+  const el = document.querySelector(".zoom-hint");
+  if (!el) return;
+  el.style.display = map.getZoom() < MIN_ZOOM ? "block" : "none";
+}
+
+// --- Layer groups (so we can clear markers on pan/zoom) ---
+const foodProgramsLayer = L.layerGroup().addTo(map);
+const commGardensLayer = L.layerGroup().addTo(map);
+const foodBusinessLayer = L.layerGroup().addTo(map);
+const restaurantsLayer = L.layerGroup().addTo(map);
+
+// --- Bounding box filter for current viewport ---
+function getBoundsParam(geoName = "geom") {
+  const b = map.getBounds();
+  const sw = b.getSouthWest();
+  const ne = b.getNorthEast();
+  const poly = `POLYGON((${sw.lng} ${sw.lat},${ne.lng} ${sw.lat},${ne.lng} ${ne.lat},${sw.lng} ${ne.lat},${sw.lng} ${sw.lat}))`;
+  return `in_bbox(${geoName}, ${sw.lat}, ${sw.lng}, ${ne.lat}, ${ne.lng})`;
+}
+
 // MARKERS
-// Free and low-cost food programs - 77 locations
-fetch(
-  "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/free-and-low-cost-food-programs/records?where=NOT(geom%20is%20null)&limit=100",
-)
-  .then((response) => response.json())
-  .then((locations) => {
-    locations.results.forEach((location) => {
-      const latitude =
-        typeof location.latitude === "number"
-          ? location.latitude
-          : location.geom?.lat;
-      const longitude =
-        typeof location.longitude === "number"
-          ? location.longitude
-          : location.geom?.lon;
-      const name = location.program_name;
-      if (typeof latitude === "number" && typeof longitude === "number") {
-        L.marker([latitude, longitude])
-          .addTo(map)
-          .bindPopup(name || "Location");
-      }
+// Free and low-cost food programs
+function loadFoodPrograms() {
+  foodProgramsLayer.clearLayers();
+  fetch(
+    `https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/free-and-low-cost-food-programs/records?where=NOT(geom%20is%20null)%20AND%20${getBoundsParam()}&limit=100`,
+  )
+    .then((response) => response.json())
+    .then((locations) => {
+      locations.results.forEach((location) => {
+        const latitude =
+          typeof location.latitude === "number"
+            ? location.latitude
+            : location.geom?.lat;
+        const longitude =
+          typeof location.longitude === "number"
+            ? location.longitude
+            : location.geom?.lon;
+        const name = location.program_name;
+        if (typeof latitude === "number" && typeof longitude === "number") {
+          L.marker([latitude, longitude])
+            .addTo(foodProgramsLayer)
+            .bindPopup(name || "Location");
+        }
+      });
+    })
+    .catch((error) => {
+      console.error("Error loading food program markers:", error);
     });
-  })
-  .catch((error) => {
-    console.error("Error loading location markers:", error);
-  });
+}
 
 // Community gardens
 const commGardensBaseUrl =
-  "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/community-gardens-and-food-trees/records?where=NOT(geo_point_2d%20is%20null)";
+  "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/community-gardens-and-food-trees/records";
 let commGardensCount = 0;
 
 function loadCommunityGardens(offset = 0) {
-  fetch(`${commGardensBaseUrl}&limit=${API_LIMIT}&offset=${offset}`)
+  if (offset === 0) commGardensCount = 0;
+  fetch(
+    `${commGardensBaseUrl}?where=NOT(geo_point_2d%20is%20null)%20AND%20${getBoundsParam("geo_point_2d")}&limit=${API_LIMIT}&offset=${offset}`,
+  )
     .then((response) => response.json())
     .then((locations) => {
       if (!commGardensCount) {
@@ -75,7 +114,7 @@ function loadCommunityGardens(offset = 0) {
           L.marker([latitude, longitude], {
             icon: createColoredMarker("green"),
           })
-            .addTo(map)
+            .addTo(commGardensLayer)
             .bindPopup(name || "Location");
         }
       });
@@ -85,19 +124,20 @@ function loadCommunityGardens(offset = 0) {
       }
     })
     .catch((error) => {
-      console.error("Error loading location markers:", error);
+      console.error("Error loading community garden markers:", error);
     });
 }
 
-loadCommunityGardens(0);
-
-// All types of food-related businesses (grocery stores, food markets, pharmacies, retail dealers - food)
+// Food-related businesses
 const foodBusinessBaseUrl =
   "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/business-licences/records?where=NOT(geo_point_2d%20is%20null)%20AND%20(businesstype%3D%22Food%20Market%22%20OR%20businesstype%3D%22Grocery%20Store%22%20OR%20businesstype%3D%22Pharmacy%22%20OR%20businesstype%3D%22Retail%20Dealer%20-%20Food%22)";
 let foodBusinessCount = 0;
 
 function loadFoodBusinesses(offset = 0) {
-  fetch(`${foodBusinessBaseUrl}&limit=${API_LIMIT}&offset=${offset}`)
+  if (offset === 0) foodBusinessCount = 0;
+  fetch(
+    `${foodBusinessBaseUrl}%20AND%20${getBoundsParam("geo_point_2d")}&limit=${API_LIMIT}&offset=${offset}`,
+  )
     .then((response) => response.json())
     .then((locations) => {
       if (!foodBusinessCount) {
@@ -118,7 +158,7 @@ function loadFoodBusinesses(offset = 0) {
           L.marker([latitude, longitude], {
             icon: createColoredMarker("pink"),
           })
-            .addTo(map)
+            .addTo(foodBusinessLayer)
             .bindPopup(name || "Location");
         }
       });
@@ -128,18 +168,20 @@ function loadFoodBusinesses(offset = 0) {
       }
     })
     .catch((error) => {
-      console.error("Error loading location markers:", error);
+      console.error("Error loading food business markers:", error);
     });
 }
 
-loadFoodBusinesses(0);
-
+// Restaurants
 const restaurantsBaseUrl =
   "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/business-licences/records?where=NOT(geo_point_2d%20is%20null)%20AND%20(businesstype%3D%22Limited%20Service%20Food%20Establishment%22%20OR%20businesstype%3D%22Restaurant%22)";
 let restaurantsCount = 0;
 
 function loadRestaurants(offset = 0) {
-  fetch(`${restaurantsBaseUrl}&limit=${API_LIMIT}&offset=${offset}`)
+  if (offset === 0) restaurantsCount = 0;
+  fetch(
+    `${restaurantsBaseUrl}%20AND%20${getBoundsParam("geo_point_2d")}&limit=${API_LIMIT}&offset=${offset}`,
+  )
     .then((response) => response.json())
     .then((locations) => {
       if (!restaurantsCount) {
@@ -160,7 +202,7 @@ function loadRestaurants(offset = 0) {
           L.marker([latitude, longitude], {
             icon: createColoredMarker("red"),
           })
-            .addTo(map)
+            .addTo(restaurantsLayer)
             .bindPopup(name || "Location");
         }
       });
@@ -170,8 +212,36 @@ function loadRestaurants(offset = 0) {
       }
     })
     .catch((error) => {
-      console.error("Error loading location markers:", error);
+      console.error("Error loading restaurant markers:", error);
     });
 }
 
-loadRestaurants(0);
+// --- Refresh all markers for current viewport ---
+function refreshMarkers() {
+  updateZoomHint();
+  if (map.getZoom() < MIN_ZOOM) {
+    foodProgramsLayer.clearLayers();
+    commGardensLayer.clearLayers();
+    foodBusinessLayer.clearLayers();
+    restaurantsLayer.clearLayers();
+    return;
+  }
+  loadRestaurants(0); //calling in reverse order so that restaurants (most common) are on the bottom
+  loadFoodBusinesses(0);
+  loadCommunityGardens(0);
+  loadFoodPrograms();
+}
+
+// Debounce so panning doesn't fire on every pixel
+let refreshTimer = null;
+map.on("moveend", () => {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(refreshMarkers, 400);
+});
+map.on("zoomend", () => {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(refreshMarkers, 400);
+});
+
+// Initial load
+refreshMarkers();

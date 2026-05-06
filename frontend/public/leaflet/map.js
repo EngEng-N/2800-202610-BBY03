@@ -245,3 +245,138 @@ map.on("zoomend", () => {
 
 // Initial load
 refreshMarkers();
+
+// --- Floodplain polygons ---
+const floodplainLayer = L.layerGroup().addTo(map);
+const FLOODPLAIN_MIN_ZOOM = 12; // Floodplains are large, show earlier than markers
+
+function loadFloodplains() {
+  floodplainLayer.clearLayers();
+  if (map.getZoom() < FLOODPLAIN_MIN_ZOOM) return;
+
+  fetch(
+    "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/designated-floodplain/records?limit=100",
+  )
+    .then((response) => response.json())
+    .then((data) => {
+      data.results.forEach((record) => {
+        const geometry = record.geom?.geometry;
+        if (!geometry) return;
+
+        // Convert GeoJSON coords [lng, lat] to Leaflet [lat, lng]
+        function convertRing(ring) {
+          return ring.map(([lng, lat]) => [lat, lng]);
+        }
+
+        let latlngs;
+        if (geometry.type === "Polygon") {
+          latlngs = geometry.coordinates.map(convertRing);
+        } else if (geometry.type === "MultiPolygon") {
+          latlngs = geometry.coordinates.map((poly) => poly.map(convertRing));
+        } else {
+          return;
+        }
+
+        L.polygon(latlngs, {
+          color: "#da053a",
+          weight: 1.5,
+          fillColor: "#f84a70",
+          fillOpacity: 0.25,
+        })
+          .addTo(floodplainLayer)
+          .bindPopup(
+            `<strong>${record.name || "Floodplain"}</strong><br>${record.description || ""}`,
+          );
+      });
+    })
+    .catch((error) => {
+      console.error("Error loading floodplain polygons:", error);
+    });
+}
+
+// Hook floodplains into the existing zoom/pan refresh
+const _originalRefresh = refreshMarkers;
+refreshMarkers = function () {
+  _originalRefresh();
+  loadFloodplains();
+};
+
+// Load on init
+loadFloodplains();
+
+// --- Click-to-draw circle with radius slider ---
+
+// Create the radius slider control
+const circleControl = L.control({ position: "bottomleft" });
+circleControl.onAdd = function () {
+  const div = L.DomUtil.create("div", "circle-control");
+  div.style.cssText =
+    "background:rgba(255,255,255,0.9);padding:10px 14px;border-radius:8px;font-size:13px;color:#333;box-shadow:0 1px 4px rgba(0,0,0,0.3);min-width:180px;";
+  div.innerHTML = `
+    <div style="margin-bottom:6px;font-weight:bold;">Search Radius</div>
+    <input type="range" id="radius-slider" min="100" max="5000" step="100" value="500"
+      style="width:100%;cursor:pointer;" />
+    <div style="display:flex;justify-content:space-between;margin-top:4px;">
+      <span>100m</span>
+      <span id="radius-label" style="font-weight:bold;">500m</span>
+      <span>5km</span>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:#666;" id="circle-hint">Click map to place circle</div>
+  `;
+
+  // Prevent map clicks/drags from firing while using the slider
+  L.DomEvent.disableClickPropagation(div);
+  L.DomEvent.disableScrollPropagation(div);
+
+  return div;
+};
+circleControl.addTo(map);
+
+let activeCircle = null;
+let circleRadius = 500;
+
+// Update circle when slider moves
+map.on("controladd", function () {}); // ensure control is in DOM first
+setTimeout(function () {
+  const slider = document.getElementById("radius-slider");
+  const label = document.getElementById("radius-label");
+  if (!slider) return;
+
+  slider.addEventListener("input", function () {
+    circleRadius = parseInt(this.value);
+    label.textContent =
+      circleRadius >= 1000
+        ? (circleRadius / 1000).toFixed(1) + "km"
+        : circleRadius + "m";
+    if (activeCircle) {
+      activeCircle.setRadius(circleRadius);
+    }
+  });
+}, 100);
+
+// Draw circle on map click
+map.on("click", function (e) {
+  if (activeCircle) {
+    map.removeLayer(activeCircle);
+  }
+  activeCircle = L.circle(e.latlng, {
+    radius: circleRadius,
+    color: "#1977f1",
+    weight: 2,
+    fillColor: "#286cc5",
+    fillOpacity: 0.3,
+  }).addTo(map);
+
+  const hint = document.getElementById("circle-hint");
+  if (hint) hint.textContent = "Click map to move circle";
+});
+
+// Supposedly removes the circle on double-click, but does not always work.
+map.on("dblclick", function () {
+  if (activeCircle) {
+    map.removeLayer(activeCircle);
+    activeCircle = null;
+    const hint = document.getElementById("circle-hint");
+    if (hint) hint.textContent = "Click map to place circle";
+  }
+});

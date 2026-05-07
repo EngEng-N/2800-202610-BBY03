@@ -1,6 +1,13 @@
+{ /*Icons*/}
 import { TriangleAlert, FileSearch, MapPin } from 'lucide-react'
 
+{ /*For the MapPage.tsx*/}
+import { useNavigate } from 'react-router-dom'
+
 export default function LandingPage() {
+
+    const navigate = useNavigate()
+
     return (
         <div className="relative min-h-screen w-full flex flex-col items-center justify-between px-6 py-10 overflow-hidden">
             
@@ -48,11 +55,13 @@ export default function LandingPage() {
             </div>
 
             {/* Proceed button */}
-                <div className="relative w-full max-w-sm mx-auto mt-12 z-10">
-                    <button className="w-full bg-white text-black font-semibold text-lg py-4 rounded-full shadow-lg hover:bg-white/90 active:scale-95 transition-all duration-200">
-                        Get Started For Free
-                    </button>
-                </div>
+            <div className="relative w-full max-w-sm mx-auto z-10">
+                <button
+                    onClick={() => navigate('/map')}
+                    className="w-full bg-white text-black font-semibold text-lg py-4 rounded-full shadow-lg hover:bg-white/90 active:scale-95 transition-all duration-200">
+                    Get Started For Free
+                </button>
+            </div>
         </div>
     )
 }

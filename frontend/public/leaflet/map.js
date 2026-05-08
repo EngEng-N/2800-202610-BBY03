@@ -355,21 +355,28 @@ setTimeout(function () {
 }, 100);
 
 // Draw circle on map click
-map.on("click", function (e) {
+map.on('click', function (e) {
   if (activeCircle) {
-    map.removeLayer(activeCircle);
+    map.removeLayer(activeCircle)
   }
   activeCircle = L.circle(e.latlng, {
     radius: circleRadius,
-    color: "#1977f1",
+    color: '#1977f1',
     weight: 2,
-    fillColor: "#286cc5",
+    fillColor: '#286cc5',
     fillOpacity: 0.3,
-  }).addTo(map);
+  }).addTo(map)
 
-  const hint = document.getElementById("circle-hint");
-  if (hint) hint.textContent = "Click map to move circle";
-});
+  // Tell the React UI that a location was picked
+  window.parent.postMessage({
+    type: 'LOCATION_SELECTED',
+    lat: e.latlng.lat,
+    lng: e.latlng.lng
+  }, '*')
+
+  const hint = document.getElementById('circle-hint')
+  if (hint) hint.textContent = 'Click map to move circle'
+})
 
 // Supposedly removes the circle on double-click, but does not always work.
 map.on("dblclick", function () {
@@ -380,3 +387,17 @@ map.on("dblclick", function () {
     if (hint) hint.textContent = "Click map to place circle";
   }
 });
+
+// This connects Daniel's main page slider to this page's slider
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'SET_RADIUS') {
+    circleRadius = e.data.radius
+    const slider = document.getElementById('radius-slider')
+    const label = document.getElementById('radius-label')
+    if (slider) slider.value = circleRadius
+    if (label) label.textContent = circleRadius >= 1000
+      ? (circleRadius / 1000).toFixed(1) + 'km'
+      : circleRadius + 'm'
+    if (activeCircle) activeCircle.setRadius(circleRadius)
+  }
+})

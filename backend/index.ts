@@ -1,7 +1,8 @@
-const express = require("express");
-const routes = require("./routes.json");
+import "dotenv";
+import express, { Request, Response, NextFunction } from "express";
+import routes from "./routes.json";
 
-const app: any = express();
+const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
@@ -10,7 +11,7 @@ app.use(express.urlencoded({ extended: true }));
 const openVancouver: { path: string, url: string }[] = routes.openVancouver;
 
 for (const { path, url } of openVancouver) {
-  app.get(path, async (_req: any, res: any, next: any) => {
+  app.get(path, async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const response = await fetch(url);
       if (!response.ok) {
@@ -25,15 +26,15 @@ for (const { path, url } of openVancouver) {
   console.log(`Registered GET ${path}`);
 }
 
-app.get("/api/health", (_req: any, res: any) => {
+app.get("/api/health", (_req: Request, res: Response) => {
   res.json({ status: "ok" });
 });
 
-app.use((_req: any, res: any) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: "Not found" });
 });
 
-app.use((err: any, _req: any, res: any, _next: any) => {
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(500).json({ error: "Internal server error" });
 });

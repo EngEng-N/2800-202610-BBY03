@@ -4,9 +4,66 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>App Name - City Planning Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
   </head>
-  <body>
-    <a href="./html/map.html">map</a>
+  <body class="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+    <!-- Dark overlay background -->
+    <div class="absolute inset-0 bg-black opacity-70 -z-10"></div>
+
+    <div class="container max-w-md mx-auto px-6 py-8 text-center relative z-10">
+
+      <!-- Title -->
+      <h1 class="text-5xl font-bold mb-4">FoodGrid</h1>
+
+      <!-- Subtitle -->
+      <p class="text-sm font-light opacity-80 mb-16 leading-relaxed">
+        The go-to hub for connecting our city planners and citizens
+      </p>
+
+      <!-- Features -->
+      <div class="space-y-8 mb-16">
+        <!-- Feature 1 -->
+        <div class="flex flex-col items-center gap-3">
+          <div class="w-12 h-12 bg-white bg-opacity-10 rounded-full flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div class="text-base font-normal">Find high vulnerability areas</div>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="flex flex-col items-center gap-3">
+          <div class="w-12 h-12 bg-white bg-opacity-10 rounded-full flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <div class="text-base font-normal">Generate reports instantly</div>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="flex flex-col items-center gap-3">
+          <div class="w-12 h-12 bg-white bg-opacity-10 rounded-full flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <div class="text-base font-normal">Find your optimal location</div>
+        </div>
+      </div>
+
+      <!-- CTA Button -->
+      <a
+        href="./html/map.html"
+        class="inline-block bg-white text-gray-900 font-semibold px-8 py-4 rounded-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-white/20 active:translate-y-0"
+      >
+        Get Started For Free
+      </a>
+    </div>
+
+    <script src="./js/landing.js"></script>
   </body>
 </html>

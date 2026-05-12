@@ -1,6 +1,6 @@
 var map = L.map("map").setView([49.2789639460617, -123.122056018925], 13);
 const API_LIMIT = 100;
-const MIN_ZOOM = 17;
+const MIN_ZOOM = 16;
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution:
@@ -367,6 +367,16 @@ map.on("click", function (e) {
     fillOpacity: 0.3,
   }).addTo(map);
 
+  // Tell the React UI that a location was picked
+  window.parent.postMessage(
+    {
+      type: "LOCATION_SELECTED",
+      lat: e.latlng.lat,
+      lng: e.latlng.lng,
+    },
+    "*",
+  );
+
   const hint = document.getElementById("circle-hint");
   if (hint) hint.textContent = "Click map to move circle";
 });
@@ -378,5 +388,21 @@ map.on("dblclick", function () {
     activeCircle = null;
     const hint = document.getElementById("circle-hint");
     if (hint) hint.textContent = "Click map to place circle";
+  }
+});
+
+// This connects Daniel's main page slider to this page's slider
+window.addEventListener("message", function (e) {
+  if (e.data && e.data.type === "SET_RADIUS") {
+    circleRadius = e.data.radius;
+    const slider = document.getElementById("radius-slider");
+    const label = document.getElementById("radius-label");
+    if (slider) slider.value = circleRadius;
+    if (label)
+      label.textContent =
+        circleRadius >= 1000
+          ? (circleRadius / 1000).toFixed(1) + "km"
+          : circleRadius + "m";
+    if (activeCircle) activeCircle.setRadius(circleRadius);
   }
 });

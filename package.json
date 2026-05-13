@@ -1,14 +1,10 @@
 {
   "dependencies": {
-    "css": "^3.0.0",
-    "express": "^5.2.1",
-    "leaflet": "^1.9.4",
     "lucide-react": "^1.14.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-joyride": "^3.1.0",
     "react-router-dom": "^7.15.0",
-    "set-cookie-parser": "^3.1.0",
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {

@@ -1,0 +1,102 @@
+.result-panel-container {
+  background-color: #1e2125;
+  border-radius: 16px;
+  border: 1px solid black;
+  padding: 20px;
+  max-width: 340px;
+  height: auto;
+  font-family: sans-serif;
+  color: #e8e8e8;
+  margin: 0 auto;
+  text-align: center;
+  opacity: 0.8;
+}
+
+.result-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+hr {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.report-area-label {
+  font-size: 17px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.result-panel-header .close-button {
+  background: #878787;
+  border: 1px solid black;
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+p {
+  font-size: 14px;
+  color: #d8d8d8;
+  font-weight: 500;
+  padding-right: 1rem;
+}
+
+.climate-disurbance,
+.population,
+.food-diversity {
+  text-align: start;
+  margin-bottom: 1rem;
+}
+
+.label {
+  color: #878787;
+}
+
+.sub-container {
+  display: flex;
+  justify-content: space-between;
+}
+
+.overall-container {
+  margin: 0 auto;
+}
+
+.overall-container p {
+  padding: 0;
+  text-align: center;
+  color: #e8e8e8;
+}
+
+.button-container {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.button-container .area-input {
+  flex: 1;
+  background: #2c2f34;
+  border: 0.5px solid #444;
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #e8e8e8;
+  outline: "none";
+}
+
+.button-container .save-button {
+  background: #2196f3;
+  border: none;
+  border-radius: 20px;
+  color: #fff;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}

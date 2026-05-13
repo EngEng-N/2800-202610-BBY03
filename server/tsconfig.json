@@ -1,11 +1,15 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "CommonJS",
-    "moduleResolution": "node10",
+    "module": "node16",
+    "target": "es2022",
+    "lib": ["es2022"],
+    "moduleResolution": "node16",
     "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": true,
     "skipLibCheck": true,
-    "strict": false,
-    "ignoreDeprecations": "6.0"
-  }
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
 }

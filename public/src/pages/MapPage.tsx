@@ -12,7 +12,7 @@ M3 - Main UI
 */
 }
 
-type AppStep = "M1" | "M2" | "M3";
+type AppStep = "M1" | "M2" | "M3" | "M4";
 
 export default function MapPage() {
   const [step, setStep] = useState<AppStep>("M1");
@@ -39,6 +39,7 @@ export default function MapPage() {
     const handleMessage = async (e: MessageEvent) => {
       if (e.data?.type === "LOCATION_SELECTED") {
         const { lat, lng } = e.data;
+        setCoords({ lat, lng });
 
         // Reverse geocode coordinates to a readable address
         try {
@@ -97,6 +98,10 @@ export default function MapPage() {
       placement: "top",
     },
   ];
+
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
 
   return (
     <div className="relative h-screen w-full flex flex-col bg-[#1a1a2e] overflow-hidden">
@@ -239,9 +244,34 @@ export default function MapPage() {
           </div>
 
           {/* Generate report button */}
-          <button className="w-full bg-blue-500 hover:bg-blue-600 active:scale-95 transition-all text-white font-semibold py-4 rounded-full text-base generate-button">
+          <button
+            onClick={async () => {
+              if (!coords) return;
+              setStep("M4");
+              const res = await fetch(
+                `/api/report-data?lat=${coords.lat}&lng=${coords.lng}`,
+              );
+              const data = await res.json();
+              console.log(data); // we'll replace this with navigation to report page next
+              setStep("M3"); // temporary — will navigate to report page instead
+            }}
+            className="w-full bg-blue-500 hover:bg-blue-600 active:scale-95 transition-all text-white font-semibold py-4 rounded-full text-base generate-button"
+          >
             Generate report ↗
           </button>
+        </div>
+      )}
+
+      {/* M4 - Loading Overlay for generating report */}
+      {step === "M4" && (
+        <div className="absolute inset-0 bg-black/70 z-20 flex flex-col items-center justify-center gap-4">
+          <div className="w-10 h-10 border-4 border-white/20 border-t-blue-400 rounded-full animate-spin" />
+          <p className="text-white font-semibold text-lg">
+            Generating Report...
+          </p>
+          <p className="text-white/50 text-sm">
+            Analyzing food access vulnerability
+          </p>
         </div>
       )}
 

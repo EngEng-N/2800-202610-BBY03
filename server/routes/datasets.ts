@@ -27,7 +27,7 @@ for (const { path, url } of openVancouver) {
       next(err);
     }
   });
-  console.log(`Registered GET /api/datasets/${path}`);
+  console.log(`Registered GET /api/datasets${path}`);
 }
 
 // Api endpoints for Temperature
@@ -45,7 +45,7 @@ for (const { path, url } of temperature) {
       next(err);
     }
   });
-  console.log(`Registered GET /api/datasets/${path}`);
+  console.log(`Registered GET /api/datasets${path}`);
 }
 
 // Api endpoint for Census

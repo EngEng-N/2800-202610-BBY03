@@ -1,7 +1,28 @@
 {
   "dependencies": {
+    "css": "^3.0.0",
     "express": "^5.2.1",
     "leaflet": "^1.9.4",
-    "node": "^24.15.0"
-  }
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-joyride": "^3.1.0",
+    "react-router-dom": "^7.15.0",
+    "set-cookie-parser": "^3.1.0",
+    "tailwindcss": "^4.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "type": "module"
 }

@@ -1,3 +1,6 @@
+import { getPopulationVulnerability } from "./populationVulnerability";
+import { getNeighbourhoodFromCoords } from "./neighbourhoodMatcher";
+
 const express = require("express");
 const fs = require("fs");
 const nodePath = require("path");
@@ -9,6 +12,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ─── Open Vancouver API proxy routes ─────────────────────────────────────────
 const openVancouver: { path: string; url: string }[] = routes.openVancouver;
 
 for (const { path, url } of openVancouver) {
@@ -27,10 +31,12 @@ for (const { path, url } of openVancouver) {
   console.log(`Registered GET ${path}`);
 }
 
+// ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (_req: any, res: any) => {
   res.json({ status: "ok" });
 });
 
+// ─── Census CSV parser (TB's implementation) ──────────────────────────────────
 function parseCsvLine(line: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -110,6 +116,73 @@ app.get(
 );
 console.log("Registered GET /datasets/census-local-area-profiles-2016/csv");
 
+// ─── Neighbourhood matcher route ──────────────────────────────────────────────
+app.get("/api/neighbourhood", (req: any, res: any) => {
+  const lat = parseFloat(req.query.lat as string);
+  const lng = parseFloat(req.query.lng as string);
+
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: "Missing lat/lng" });
+  }
+
+  const boundaryPath = nodePath.join(
+    __dirname,
+    "datasets",
+    "local-area-boundary.json",
+  );
+
+  const neighbourhood = getNeighbourhoodFromCoords(lat, lng, boundaryPath);
+  if (!neighbourhood) {
+    return res
+      .status(404)
+      .json({ error: "No neighbourhood found for these coordinates" });
+  }
+
+  return res.json({ neighbourhood });
+});
+console.log("Registered GET /api/neighbourhood");
+
+// ─── Report data route ────────────────────────────────────────────────────────
+// Takes lat/lng → matches neighbourhood → returns population vulnerability score
+app.get("/api/report-data", (req: any, res: any) => {
+  const lat = parseFloat(req.query.lat as string);
+  const lng = parseFloat(req.query.lng as string);
+
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: "Missing lat/lng" });
+  }
+
+  // Step 1 — coords → neighbourhood name
+  const boundaryPath = nodePath.join(
+    __dirname,
+    "datasets",
+    "local-area-boundary.json",
+  );
+  const neighbourhood = getNeighbourhoodFromCoords(lat, lng, boundaryPath);
+  if (!neighbourhood) {
+    return res
+      .status(404)
+      .json({ error: "Location is outside Vancouver neighbourhoods" });
+  }
+
+  // Step 2 — neighbourhood name → population vulnerability scores
+  const csvPath = nodePath.join(
+    __dirname,
+    "datasets",
+    "CensusLocalAreaProfiles2016.csv",
+  );
+  const result = getPopulationVulnerability(neighbourhood, csvPath);
+  if (!result) {
+    return res
+      .status(500)
+      .json({ error: `Could not find census data for ${neighbourhood}` });
+  }
+
+  return res.json(result);
+});
+console.log("Registered GET /api/report-data");
+
+// ─── 404 + error handlers ─────────────────────────────────────────────────────
 app.use((_req: any, res: any) => {
   res.status(404).json({ error: "Not found" });
 });
@@ -119,10 +192,12 @@ app.use((err: any, _req: any, res: any, _next: any) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
+// ─── Start server ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
 
+// ─── Vulnerability score calculation functions (TB's implementation) ──────────
 function heatExposureScore(
   outdoorProviders: number,
   totalProviders: number,
@@ -130,8 +205,12 @@ function heatExposureScore(
   return outdoorProviders / totalProviders;
 }
 
-function floodExposureScore(inFloodZone: number, totalProviders: number, area: number): number {
-    return (inFloodZone * (totalProviders / area)) / 100;
+function floodExposureScore(
+  inFloodZone: number,
+  totalProviders: number,
+  area: number,
+): number {
+  return (inFloodZone * (totalProviders / area)) / 100;
 }
 
 function populationVulnerabilityScore(populationDetails: object): number {
@@ -157,6 +236,10 @@ function vulnerabilityScore(
   const w4: number = 1;
 
   return (
-    (w1 * hazardExposureScore + w2 * populationVulnerabilityScore + w3 * providerDiversityScore + w4 * floodExposureScore) / 100
+    (w1 * hazardExposureScore +
+      w2 * populationVulnerabilityScore +
+      w3 * providerDiversityScore +
+      w4 * floodExposureScore) /
+    100
   );
 }

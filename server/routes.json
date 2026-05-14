@@ -1,10 +1,6 @@
 {
   "openVancouver": [
     {
-      "path": "/community-gardens-and-food-trees",
-      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/community-gardens-and-food-trees/records?limit=20"
-    },
-    {
       "path": "/food-providers/geojson",
       "url": "https://openmaps.gov.bc.ca/geo/pub/WHSE_IMAGERY_AND_BASE_MAPS.GSR_FOOD_BANKS_SV/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=pub:WHSE_IMAGERY_AND_BASE_MAPS.GSR_FOOD_BANKS_SV&outputFormat=application/json"
     },
@@ -17,20 +13,34 @@
       "url": "https://open.canada.ca/data/api/3/action/resource_show?id=0331f1c5-40a2-47f8-8f9c-8634fa2142b9"
     },
     {
-      "path": "/food-vendors",
-      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/food-vendors/records?limit=20"
-    },
-    {
       "path": "/flood-plain",
       "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/flood-plain/exports/geojson"
     },
     {
       "path": "/local-area-boundary",
       "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/local-area-boundary/exports/geojson"
+    }
+  ],
+  "foodLocations": [
+    {
+      "path": "/community-gardens-and-food-trees",
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/community-gardens-and-food-trees/records?where=NOT(geom%20is%20null)"
     },
     {
       "path": "/free-low-cost-food",
-      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/free-and-low-cost-food-programs/records?limit=200"
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/free-and-low-cost-food-programs/records?where=NOT(geom%20is%20null)"
+    },
+    {
+      "path": "/food-related-businesses",
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/business-licences/records?where=NOT(geo_point_2d%20is%20null)%20AND%20(businesstype%3D%22Food%20Market%22%20OR%20businesstype%3D%22Grocery%20Store%22%20OR%20businesstype%3D%22Pharmacy%22%20OR%20businesstype%3D%22Retail%20Dealer%20-%20Food%22)"
+    },
+    {
+      "path": "/restaurants",
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/business-licences/records?where=NOT(geo_point_2d%20is%20null)%20AND%20(businesstype%3D%22Limited%20Service%20Food%20Establishment%22%20OR%20businesstype%3D%22Restaurant%22)"
+    },
+    {
+      "path": "/food-vendors",
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/food-vendors/records?where=NOT(geom%20is%20null)"
     }
   ],
   "temperature": [

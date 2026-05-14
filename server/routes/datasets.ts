@@ -13,7 +13,6 @@ const openVancouver: { path: string; url: string }[] = routes.openVancouver;
 const foodLocations: { path: string; url: string }[] = routes.foodLocations;
 const temperature: { path: string; url: string }[] = routes.temperature;
 
-// Api endpoints for Open Vancouver
 for (const { path, url } of foodLocations) {
   const API_MAX = 0;
 
@@ -52,7 +51,23 @@ for (const { path, url } of foodLocations) {
   console.log(`Registered GET /api/datasets/${path}`);
 }
 
-// Api endpoints for Temperature
+for (const { path, url } of openVancouver) {
+  router.get(path, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        res.status(response.status).json({ error: "Upstream error" });
+        return;
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  });
+  console.log(`Registered GET /api/datasets${path}`);
+}
+
 for (const { path, url } of temperature) {
   router.get(path, async (req: Request, res: Response, next: NextFunction) => {
     try {

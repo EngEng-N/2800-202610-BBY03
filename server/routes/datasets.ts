@@ -15,6 +15,15 @@ const temperature: { path: string; url: string }[] = routes.temperature;
 // Api endpoints for Open Vancouver
 for (const { path, url } of openVancouver) {
   router.get(path, async (req: Request, res: Response, next: NextFunction) => {
+    const lon: any = req.query.lon;
+    const lat: any = req.query.lat;
+    const radius: any = req.query.radius;
+
+    if (!lon || !lat || !radius || typeof lon !== "string" || typeof lat !== "string" || typeof radius !== "string") {
+      res.status(400).json({ error: "Invalid query parameters: lon, lat, radius must be strings" });
+      return;
+    }
+    
     try {
       const response = await fetch(url);
       if (!response.ok) {
@@ -27,7 +36,7 @@ for (const { path, url } of openVancouver) {
       next(err);
     }
   });
-  console.log(`Registered GET /api/datasets${path}`);
+  console.log(`Registered GET /api/datasets/${path}`);
 }
 
 // Api endpoints for Temperature
@@ -45,7 +54,7 @@ for (const { path, url } of temperature) {
       next(err);
     }
   });
-  console.log(`Registered GET /api/datasets${path}`);
+  console.log(`Registered GET /api/datasets/${path}`);
 }
 
 // Api endpoint for Census

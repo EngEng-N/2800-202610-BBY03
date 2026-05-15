@@ -7,11 +7,15 @@ import express, {
   type Request,
   type Response,
 } from "express";
-import datasetRouter from "./routes/datasets";
+import "dotenv/config";
+// import session from "express-session";
+// import MongoStore from "connect-mongo";
 
-const fs = require("fs");
-const nodePath = require("path");
-const routes = require("./routes.json");
+import datasetRouter from "./routes/datasets";
+import reportRouter from "./routes/report";
+import summaryRouter from "./routes/summary";
+// import authRouter from "./routes/auth";
+// import { mongoUri, mongoDbName } from "./helpers/mongo";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -39,8 +43,32 @@ for (const { path, url } of openVancouver) {
   console.log(`Registered GET ${path}`);
 }
 
-// ─── Health check ─────────────────────────────────────────────────────────────
-app.get("/api/health", (_req: Request, res: Response) => {
+// app.use(
+//   session({
+//     secret: process.env.SESSION_SECRET ?? "dev-secret-change-me",
+//     resave: false,
+//     saveUninitialized: false,
+//     store: MongoStore.create({
+//       mongoUrl: mongoUri,
+//       dbName: mongoDbName,
+//       collectionName: "sessions",
+//       crypto: {
+//         secret: process.env.SESSION_CRYPTO_SECRET ?? "dev-crypto-change-me",
+//       },
+//     }),
+//     cookie: {
+//       httpOnly: true,
+//       maxAge: 1000 * 60 * 60 * 24 * 7,
+//     },
+//   }),
+// );
+
+// app.use('/api/auth', authRouter);
+app.use('/api/datasets', datasetRouter);
+app.use('/api/report-data', reportRouter);
+app.use('/api/summary', summaryRouter);
+
+app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 

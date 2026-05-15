@@ -26,7 +26,7 @@
     },
     {
       "path": "/datasets/flood-plain",
-      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/flood-plain/exports/geojson"
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/designated-floodplain/exports/geojson"
     },
     {
       "path": "/datasets/local-area-boundary",

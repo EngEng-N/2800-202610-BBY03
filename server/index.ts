@@ -1,6 +1,7 @@
 import { getPopulationVulnerability } from "./populationVulnerability";
 import { getNeighbourhoodFromCoords } from "./neighbourhoodMatcher";
 import { getHeatExposureScore } from "./heatExposureScore";
+import { getFloodExposureScore } from "./floodExposureScore";
 
 const express = require("express");
 const fs = require("fs");
@@ -184,7 +185,7 @@ app.get("/api/report-data", (req: any, res: any) => {
 console.log("Registered GET /api/report-data");
 
 // ─── Report data route ────────────────────────────────────────────────────────
-// Takes tree canopy data → returns which part is
+// API for heat exposure
 app.get("/api/heat-exposure", async (req: any, res: any) => {
   const lat = parseFloat(req.query.lat as string);
   const lng = parseFloat(req.query.lng as string);
@@ -205,6 +206,28 @@ app.get("/api/heat-exposure", async (req: any, res: any) => {
   }
 });
 console.log("Registered GET /api/heat-exposure");
+
+// ─── Report data route ────────────────────────────────────────────────────────
+// API for flood exposure
+app.get("/api/flood-exposure", async (req: any, res: any) => {
+  const lat = parseFloat(req.query.lat as string);
+  const lng = parseFloat(req.query.lng as string);
+
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: "Missing lat/lng" });
+  }
+
+  try {
+    const result = await getFloodExposureScore(lat, lng);
+    return res.json({ lat, lng, ...result });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch flood exposure data" });
+  }
+});
+console.log("Registered GET /api/flood-exposure");
 
 // ─── 404 + error handlers ─────────────────────────────────────────────────────
 app.use((_req: any, res: any) => {

@@ -13,8 +13,12 @@
       "url": "https://open.canada.ca/data/api/3/action/resource_show?id=0331f1c5-40a2-47f8-8f9c-8634fa2142b9"
     },
     {
-      "path": "/flood-plain",
-      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/flood-plain/exports/geojson"
+      "path": "/datasets/food-vendors",
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/food-vendors/records?limit=20"
+    },
+    {
+      "path": "/datasets/flood-plain",
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/designated-floodplain/exports/geojson"
     },
     {
       "path": "/local-area-boundary",

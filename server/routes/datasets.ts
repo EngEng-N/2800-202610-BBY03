@@ -64,7 +64,7 @@ for (const { path, url } of foodLocations) {
       next(err);
     }
   });
-  console.log(`Registered GET /api/datasets/${path}`);
+  console.log(`Registered GET /api/datasets${path}`);
 }
 
 for (const { path, url } of openVancouver) {
@@ -98,7 +98,7 @@ for (const { path, url } of temperature) {
       next(err);
     }
   });
-  console.log(`Registered GET /api/datasets/${path}`);
+  console.log(`Registered GET /api/datasets${path}`);
 }
 
 // Api endpoint for Census

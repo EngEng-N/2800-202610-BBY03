@@ -3,10 +3,13 @@ import express, {
   type Request,
   type Response,
 } from "express";
+import "dotenv/config";
 // import session from "express-session";
 // import MongoStore from "connect-mongo";
 
 import datasetRouter from "./routes/datasets";
+import reportRouter from "./routes/report";
+import summaryRouter from "./routes/summary";
 // import authRouter from "./routes/auth";
 // import { mongoUri, mongoDbName } from "./helpers/mongo";
 
@@ -38,6 +41,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // app.use('/api/auth', authRouter);
 app.use('/api/datasets', datasetRouter);
+app.use('/api/report-data', reportRouter);
+app.use('/api/summary', summaryRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });

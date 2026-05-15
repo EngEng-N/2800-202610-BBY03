@@ -1,5 +1,6 @@
 import { getPopulationVulnerability } from "./populationVulnerability";
 import { getNeighbourhoodFromCoords } from "./neighbourhoodMatcher";
+import { getHeatExposureScore } from "./heatExposureScore";
 
 const express = require("express");
 const fs = require("fs");
@@ -181,6 +182,29 @@ app.get("/api/report-data", (req: any, res: any) => {
   return res.json(result);
 });
 console.log("Registered GET /api/report-data");
+
+// ─── Report data route ────────────────────────────────────────────────────────
+// Takes tree canopy data → returns which part is
+app.get("/api/heat-exposure", async (req: any, res: any) => {
+  const lat = parseFloat(req.query.lat as string);
+  const lng = parseFloat(req.query.lng as string);
+  const radius = parseInt(req.query.radius as string) || 500;
+
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: "Missing lat/lng" });
+  }
+
+  try {
+    const result = await getHeatExposureScore(lat, lng, radius);
+    return res.json({ lat, lng, radius, ...result });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch heat exposure data" });
+  }
+});
+console.log("Registered GET /api/heat-exposure");
 
 // ─── 404 + error handlers ─────────────────────────────────────────────────────
 app.use((_req: any, res: any) => {

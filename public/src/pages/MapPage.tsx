@@ -12,6 +12,8 @@ M3 - Main UI
 */
 }
 
+const url = "http://localhost:3000";
+
 type AppStep = "M1" | "M2" | "M3" | "M4";
 
 export default function MapPage() {
@@ -35,24 +37,51 @@ export default function MapPage() {
   };
 
   // Listen for location selected event from the map iframe
+  const [outdoor, setOutdoor] = useState(0);
+  const [indoor, setIndoor] = useState(0);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
+
+  const radiusRef = useRef(radius);
+  useEffect(() => {
+    radiusRef.current = radius;
+  }, [radius]);
+
   useEffect(() => {
     const handleMessage = async (e: MessageEvent) => {
       if (e.data?.type === "LOCATION_SELECTED") {
-        const { lat, lng } = e.data;
-        setCoords({ lat, lng });
+        const selectedLat = e.data.lat;
+        const selectedLng = e.data.lng;
+        setCoords({ lat: selectedLat, lng: selectedLng });
+        setOutdoor(0);
+        setIndoor(0);
+
+        outdoorVendorCall(
+          selectedLat,
+          selectedLng,
+          radiusRef.current,
+          setOutdoor,
+        );
+        indoorVendorCall(
+          selectedLat,
+          selectedLng,
+          radiusRef.current,
+          setIndoor,
+        );
 
         // Reverse geocode coordinates to a readable address
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            `https://nominatim.openstreetmap.org/reverse?lat=${selectedLat}&lon=${selectedLng}&format=json`,
           );
           const data = await res.json();
           const label =
             data.display_name?.split(",").slice(0, 2).join(",") ??
-            `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            `${selectedLat.toFixed(4)}, ${selectedLng.toFixed(4)}`;
           setLocation(label);
         } catch {
-          setLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+          setLocation(`${selectedLat.toFixed(4)}, ${selectedLng.toFixed(4)}`);
         }
 
         setStep("M2");
@@ -61,6 +90,16 @@ export default function MapPage() {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, []);
+
+  useEffect(() => {
+    if (!coords) return;
+
+    setOutdoor(0);
+    setIndoor(0);
+
+    outdoorVendorCall(coords.lat, coords.lng, radius, setOutdoor);
+    indoorVendorCall(coords.lat, coords.lng, radius, setIndoor);
+  }, [coords, radius]);
 
   // Tour steps
   const tourSteps: Step[] = [
@@ -98,10 +137,6 @@ export default function MapPage() {
       placement: "top",
     },
   ];
-
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
-    null,
-  );
 
   return (
     <div className="relative h-screen w-full flex flex-col bg-[#1a1a2e] overflow-hidden">
@@ -234,11 +269,11 @@ export default function MapPage() {
               <p className="text-white/40 text-xs">Area km²</p>
             </div>
             <div className="flex-1 bg-[#2a2a3e] rounded-2xl p-4">
-              <p className="text-white text-lg font-bold">4</p>
+              <p className="text-white text-lg font-bold">{outdoor}</p>
               <p className="text-white/40 text-xs">Outdoor vendors</p>
             </div>
             <div className="flex-1 bg-[#2a2a3e] rounded-2xl p-4">
-              <p className="text-white text-lg font-bold">6</p>
+              <p className="text-white text-lg font-bold">{indoor}</p>
               <p className="text-white/40 text-xs">Indoor vendors</p>
             </div>
           </div>
@@ -278,4 +313,50 @@ export default function MapPage() {
       <Joyride steps={tourSteps} run={runTour} continuous />
     </div>
   );
+}
+
+async function outdoorVendorCall(
+  lat: number,
+  lng: number,
+  radius: number,
+  setOutdoor: React.Dispatch<React.SetStateAction<number>>,
+) {
+  const sources = ["community-gardens-and-food-trees", "food-vendors"];
+
+  const totals = await Promise.all(
+    sources.map(async (path) => {
+      const response = await fetch(
+        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
+      );
+      const data = await response.json();
+      return Number(data.total_count ?? 0);
+    }),
+  );
+
+  setOutdoor(totals.reduce((sum, count) => sum + count, 0));
+}
+
+async function indoorVendorCall(
+  lat: number,
+  lng: number,
+  radius: number,
+  setIndoor: React.Dispatch<React.SetStateAction<number>>,
+) {
+  const sources = [
+    "free-low-cost-food",
+    "food-related-businesses",
+    "restaurants",
+  ];
+
+  const totals = await Promise.all(
+    sources.map(async (path) => {
+      const response = await fetch(
+        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
+      );
+      const data = await response.json();
+      return Number(data.total_count ?? 0);
+    }),
+  );
+
+  setIndoor(totals.reduce((sum, count) => sum + count, 0));
 }

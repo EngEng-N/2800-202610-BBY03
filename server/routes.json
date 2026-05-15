@@ -1,23 +1,15 @@
 {
   "openVancouver": [
     {
-      "path": "/datasets/community-gardens-and-food-trees",
-      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/community-gardens-and-food-trees/records?limit=20"
-    },
-    {
-      "path": "/datasets/food-providers/geojson",
+      "path": "/food-providers/geojson",
       "url": "https://openmaps.gov.bc.ca/geo/pub/WHSE_IMAGERY_AND_BASE_MAPS.GSR_FOOD_BANKS_SV/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=pub:WHSE_IMAGERY_AND_BASE_MAPS.GSR_FOOD_BANKS_SV&outputFormat=application/json"
     },
     {
-      "path": "/datasets/census-local-area-profiles-2016",
-      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/census-local-area-profiles-2016/records?limit=20"
-    },
-    {
-      "path": "/datasets/food-banks/metadata",
+      "path": "/food-banks/metadata",
       "url": "https://catalogue.data.gov.bc.ca/api/3/action/package_show?id=food-banks"
     },
     {
-      "path": "/datasets/food-banks/original-metadata",
+      "path": "/food-banks/original-metadata",
       "url": "https://open.canada.ca/data/api/3/action/resource_show?id=0331f1c5-40a2-47f8-8f9c-8634fa2142b9"
     },
     {
@@ -29,21 +21,39 @@
       "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/designated-floodplain/exports/geojson"
     },
     {
-      "path": "/datasets/local-area-boundary",
+      "path": "/local-area-boundary",
       "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/local-area-boundary/exports/geojson"
+    }
+  ],
+  "foodLocations": [
+    {
+      "path": "/community-gardens-and-food-trees",
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/community-gardens-and-food-trees/records?where=NOT(geom%20is%20null)"
     },
     {
-      "path": "/datasets/free-low-cost-food",
-      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/free-and-low-cost-food-programs/records?limit=200"
+      "path": "/free-low-cost-food",
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/free-and-low-cost-food-programs/records?where=NOT(geom%20is%20null)"
+    },
+    {
+      "path": "/food-related-businesses",
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/business-licences/records?where=NOT(geo_point_2d%20is%20null)%20AND%20(businesstype%3D%22Food%20Market%22%20OR%20businesstype%3D%22Grocery%20Store%22%20OR%20businesstype%3D%22Pharmacy%22%20OR%20businesstype%3D%22Retail%20Dealer%20-%20Food%22)"
+    },
+    {
+      "path": "/restaurants",
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/business-licences/records?where=NOT(geo_point_2d%20is%20null)%20AND%20(businesstype%3D%22Limited%20Service%20Food%20Establishment%22%20OR%20businesstype%3D%22Restaurant%22)"
+    },
+    {
+      "path": "/food-vendors",
+      "url": "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/food-vendors/records?where=NOT(geom%20is%20null)"
     }
   ],
   "temperature": [
     {
-      "path": "/datasets/heat-historical",
+      "path": "/heat-historical",
       "url": "https://archive-api.open-meteo.com/v1/archive?latitude={latitude}&longitude={longitude}&start_date={start_date}&end_date={end_date}&daily=temperature_2m_max&timezone=America/Vancouver"
     },
     {
-      "path": "/datasets/heat-projections",
+      "path": "/heat-projections",
       "url": "https://climate-api.open-meteo.com/v1/climate?latitude={latitude}&longitude={longitude}&start_date={start_date}&end_date={end_date}&models=EC_Earth3P_HR&daily=temperature_2m_max"
     }
   ]

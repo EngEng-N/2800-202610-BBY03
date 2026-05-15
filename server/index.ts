@@ -2,23 +2,29 @@ import { getPopulationVulnerability } from "./populationVulnerability";
 import { getNeighbourhoodFromCoords } from "./neighbourhoodMatcher";
 import { getHeatExposureScore } from "./heatExposureScore";
 import { getFloodExposureScore } from "./floodExposureScore";
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
+import datasetRouter from "./routes/datasets";
 
-const express = require("express");
 const fs = require("fs");
 const nodePath = require("path");
 const routes = require("./routes.json");
 
-const app: any = express();
+const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/api/datasets", datasetRouter);
 
 // ─── Open Vancouver API proxy routes ─────────────────────────────────────────
 const openVancouver: { path: string; url: string }[] = routes.openVancouver;
 
 for (const { path, url } of openVancouver) {
-  app.get(path, async (_req: any, res: any, next: any) => {
+  app.get(path, async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const response = await fetch(url);
       if (!response.ok) {
@@ -34,11 +40,11 @@ for (const { path, url } of openVancouver) {
 }
 
 // ─── Health check ─────────────────────────────────────────────────────────────
-app.get("/api/health", (_req: any, res: any) => {
+app.get("/api/health", (_req: Request, res: Response) => {
   res.json({ status: "ok" });
 });
 
-// ─── Census CSV parser (TB's implementation) ──────────────────────────────────
+// ─── Census CSV parser ────────────────────────────────────────────────────────
 function parseCsvLine(line: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -108,7 +114,7 @@ function loadCensus2016() {
 
 app.get(
   "/datasets/census-local-area-profiles-2016/csv",
-  (_req: any, res: any, next: any) => {
+  (_req: Request, res: Response, next: NextFunction) => {
     try {
       res.json(loadCensus2016());
     } catch (err) {
@@ -119,7 +125,7 @@ app.get(
 console.log("Registered GET /datasets/census-local-area-profiles-2016/csv");
 
 // ─── Neighbourhood matcher route ──────────────────────────────────────────────
-app.get("/api/neighbourhood", (req: any, res: any) => {
+app.get("/api/neighbourhood", (req: Request, res: Response) => {
   const lat = parseFloat(req.query.lat as string);
   const lng = parseFloat(req.query.lng as string);
 
@@ -145,16 +151,15 @@ app.get("/api/neighbourhood", (req: any, res: any) => {
 console.log("Registered GET /api/neighbourhood");
 
 // ─── Report data route ────────────────────────────────────────────────────────
-// Takes lat/lng → matches neighbourhood → returns population vulnerability score
-app.get("/api/report-data", (req: any, res: any) => {
+app.get("/api/report-data", async (req: Request, res: Response) => {
   const lat = parseFloat(req.query.lat as string);
   const lng = parseFloat(req.query.lng as string);
+  const radius = parseInt(req.query.radius as string) || 500;
 
   if (isNaN(lat) || isNaN(lng)) {
     return res.status(400).json({ error: "Missing lat/lng" });
   }
 
-  // Step 1 — coords → neighbourhood name
   const boundaryPath = nodePath.join(
     __dirname,
     "datasets",
@@ -167,26 +172,40 @@ app.get("/api/report-data", (req: any, res: any) => {
       .json({ error: "Location is outside Vancouver neighbourhoods" });
   }
 
-  // Step 2 — neighbourhood name → population vulnerability scores
   const csvPath = nodePath.join(
     __dirname,
     "datasets",
     "CensusLocalAreaProfiles2016.csv",
   );
-  const result = getPopulationVulnerability(neighbourhood, csvPath);
-  if (!result) {
+  const populationResult = getPopulationVulnerability(neighbourhood, csvPath);
+  if (!populationResult) {
     return res
       .status(500)
       .json({ error: `Could not find census data for ${neighbourhood}` });
   }
 
-  return res.json(result);
+  const [heatResult, floodResult] = await Promise.all([
+    getHeatExposureScore(lat, lng, radius),
+    getFloodExposureScore(lat, lng),
+  ]);
+
+  const climateDisruptionScore = Math.round(
+    (heatResult.heatExposureScore + floodResult.floodExposureScore) / 2,
+  );
+
+  return res.json({
+    ...populationResult,
+    heatExposureScore: heatResult.heatExposureScore,
+    floodExposureScore: floodResult.floodExposureScore,
+    inFloodZone: floodResult.inFloodZone,
+    floodZoneName: floodResult.floodZoneName,
+    climateDisruptionScore,
+  });
 });
 console.log("Registered GET /api/report-data");
 
-// ─── Report data route ────────────────────────────────────────────────────────
-// API for heat exposure
-app.get("/api/heat-exposure", async (req: any, res: any) => {
+// ─── Heat exposure route ──────────────────────────────────────────────────────
+app.get("/api/heat-exposure", async (req: Request, res: Response) => {
   const lat = parseFloat(req.query.lat as string);
   const lng = parseFloat(req.query.lng as string);
   const radius = parseInt(req.query.radius as string) || 500;
@@ -207,9 +226,8 @@ app.get("/api/heat-exposure", async (req: any, res: any) => {
 });
 console.log("Registered GET /api/heat-exposure");
 
-// ─── Report data route ────────────────────────────────────────────────────────
-// API for flood exposure
-app.get("/api/flood-exposure", async (req: any, res: any) => {
+// ─── Flood exposure route ─────────────────────────────────────────────────────
+app.get("/api/flood-exposure", async (req: Request, res: Response) => {
   const lat = parseFloat(req.query.lat as string);
   const lng = parseFloat(req.query.lng as string);
 
@@ -230,11 +248,11 @@ app.get("/api/flood-exposure", async (req: any, res: any) => {
 console.log("Registered GET /api/flood-exposure");
 
 // ─── 404 + error handlers ─────────────────────────────────────────────────────
-app.use((_req: any, res: any) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: "Not found" });
 });
 
-app.use((err: any, _req: any, res: any, _next: any) => {
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(500).json({ error: "Internal server error" });
 });
@@ -243,50 +261,3 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-
-// ─── Vulnerability score calculation functions (TB's implementation) ──────────
-function heatExposureScore(
-  outdoorProviders: number,
-  totalProviders: number,
-): number {
-  return outdoorProviders / totalProviders;
-}
-
-function floodExposureScore(
-  inFloodZone: number,
-  totalProviders: number,
-  area: number,
-): number {
-  return (inFloodZone * (totalProviders / area)) / 100;
-}
-
-function populationVulnerabilityScore(populationDetails: object): number {
-  return 0;
-}
-
-function providerDiversityScore(
-  outdoorProviders: number,
-  indoorProviders: number,
-): number {
-  return Math.abs(outdoorProviders - indoorProviders) / 100;
-}
-
-function vulnerabilityScore(
-  hazardExposureScore: number,
-  populationVulnerabilityScore: number,
-  providerDiversityScore: number,
-  floodExposureScore: number,
-): number {
-  const w1: number = 1;
-  const w2: number = 0.9;
-  const w3: number = 0.5;
-  const w4: number = 1;
-
-  return (
-    (w1 * hazardExposureScore +
-      w2 * populationVulnerabilityScore +
-      w3 * providerDiversityScore +
-      w4 * floodExposureScore) /
-    100
-  );
-}

@@ -41,7 +41,16 @@ for (const { path, url } of foodLocations) {
       return;
     }
 
-    const urlWithParams = `${url}%20AND%20within_distance(geo_point_2d, geom'POINT(${lon} ${lat})', ${radius})&limit=${API_MAX}`;
+    let urlWithParams =
+      path === "/free-low-cost-food"
+        ? `${url}%20AND%20within_distance(geom, geom'POINT(${lon} ${lat})', ${radius})&limit=${API_MAX}`
+        : `${url}%20AND%20within_distance(geo_point_2d, geom'POINT(${lon} ${lat})', ${radius})&limit=${API_MAX}`;
+
+    if (path === "/free-low-cost-food") {
+      urlWithParams = `${url}%20AND%20within_distance(geom, geom'POINT(${lon} ${lat})', ${radius})&limit=${API_MAX}`;
+    } else {
+      urlWithParams = `${url}%20AND%20within_distance(geo_point_2d, geom'POINT(${lon} ${lat})', ${radius})&limit=${API_MAX}`;
+    }
 
     try {
       const response = await fetch(urlWithParams);

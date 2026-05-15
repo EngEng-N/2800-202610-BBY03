@@ -12,7 +12,7 @@ M3 - Main UI
 */
 }
 
-const url = "http://localhost:3000"
+const url = "http://localhost:3000";
 
 type AppStep = "M1" | "M2" | "M3" | "M4";
 
@@ -57,8 +57,18 @@ export default function MapPage() {
         setOutdoor(0);
         setIndoor(0);
 
-        outdoorVendorCall(selectedLat, selectedLng, radiusRef.current, setOutdoor);
-        indoorVendorCall(selectedLat, selectedLng, radiusRef.current, setIndoor);
+        outdoorVendorCall(
+          selectedLat,
+          selectedLng,
+          radiusRef.current,
+          setOutdoor,
+        );
+        indoorVendorCall(
+          selectedLat,
+          selectedLng,
+          radiusRef.current,
+          setIndoor,
+        );
 
         // Reverse geocode coordinates to a readable address
         try {
@@ -90,7 +100,6 @@ export default function MapPage() {
     outdoorVendorCall(coords.lat, coords.lng, radius, setOutdoor);
     indoorVendorCall(coords.lat, coords.lng, radius, setIndoor);
   }, [coords, radius]);
-
 
   // Tour steps
   const tourSteps: Step[] = [
@@ -260,15 +269,11 @@ export default function MapPage() {
               <p className="text-white/40 text-xs">Area km²</p>
             </div>
             <div className="flex-1 bg-[#2a2a3e] rounded-2xl p-4">
-              <p className="text-white text-lg font-bold">
-                {outdoor}
-              </p>
+              <p className="text-white text-lg font-bold">{outdoor}</p>
               <p className="text-white/40 text-xs">Outdoor vendors</p>
             </div>
             <div className="flex-1 bg-[#2a2a3e] rounded-2xl p-4">
-              <p className="text-white text-lg font-bold">
-                {indoor}
-              </p>
+              <p className="text-white text-lg font-bold">{indoor}</p>
               <p className="text-white/40 text-xs">Indoor vendors</p>
             </div>
           </div>
@@ -316,15 +321,12 @@ async function outdoorVendorCall(
   radius: number,
   setOutdoor: React.Dispatch<React.SetStateAction<number>>,
 ) {
-  const sources = [
-    "community-gardens-and-food-trees",
-    "food-vendors",
-  ];
+  const sources = ["community-gardens-and-food-trees", "food-vendors"];
 
   const totals = await Promise.all(
     sources.map(async (path) => {
       const response = await fetch(
-        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}`,
+        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
       );
       const data = await response.json();
       return Number(data.total_count ?? 0);
@@ -349,7 +351,7 @@ async function indoorVendorCall(
   const totals = await Promise.all(
     sources.map(async (path) => {
       const response = await fetch(
-        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}`,
+        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
       );
       const data = await response.json();
       return Number(data.total_count ?? 0);

@@ -1,18 +1,34 @@
-const express = require("express");
-const fs = require("fs");
-const nodePath = require("path");
-const routes = require("./routes.json");
+import { getPopulationVulnerability } from "./helpers/populationVulnerability";
+import { getNeighbourhoodFromCoords } from "./helpers/neighbourhoodMatcher";
+import { getHeatExposureScore } from "./helpers/heatExposureScore";
+import { getFloodExposureScore } from "./helpers/floodExposureScore";
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
+import "dotenv/config";
+// import session from "express-session";
+// import MongoStore from "connect-mongo";
 
-const app: any = express();
+import datasetRouter from "./routes/datasets";
+import reportRouter from "./routes/report";
+import summaryRouter from "./routes/summary";
+// import authRouter from "./routes/auth";
+// import { mongoUri, mongoDbName } from "./helpers/mongo";
+
+const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/api/datasets", datasetRouter);
 
+// ─── Open Vancouver API proxy routes ─────────────────────────────────────────
 const openVancouver: { path: string; url: string }[] = routes.openVancouver;
 
 for (const { path, url } of openVancouver) {
-  app.get(path, async (_req: any, res: any, next: any) => {
+  app.get(path, async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const response = await fetch(url);
       if (!response.ok) {
@@ -27,10 +43,36 @@ for (const { path, url } of openVancouver) {
   console.log(`Registered GET ${path}`);
 }
 
-app.get("/api/health", (_req: any, res: any) => {
+// app.use(
+//   session({
+//     secret: process.env.SESSION_SECRET ?? "dev-secret-change-me",
+//     resave: false,
+//     saveUninitialized: false,
+//     store: MongoStore.create({
+//       mongoUrl: mongoUri,
+//       dbName: mongoDbName,
+//       collectionName: "sessions",
+//       crypto: {
+//         secret: process.env.SESSION_CRYPTO_SECRET ?? "dev-crypto-change-me",
+//       },
+//     }),
+//     cookie: {
+//       httpOnly: true,
+//       maxAge: 1000 * 60 * 60 * 24 * 7,
+//     },
+//   }),
+// );
+
+// app.use('/api/auth', authRouter);
+app.use('/api/datasets', datasetRouter);
+app.use('/api/report-data', reportRouter);
+app.use('/api/summary', summaryRouter);
+
+app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+// ─── Census CSV parser ────────────────────────────────────────────────────────
 function parseCsvLine(line: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -100,7 +142,7 @@ function loadCensus2016() {
 
 app.get(
   "/datasets/census-local-area-profiles-2016/csv",
-  (_req: any, res: any, next: any) => {
+  (_req: Request, res: Response, next: NextFunction) => {
     try {
       res.json(loadCensus2016());
     } catch (err) {
@@ -110,53 +152,140 @@ app.get(
 );
 console.log("Registered GET /datasets/census-local-area-profiles-2016/csv");
 
-app.use((_req: any, res: any) => {
+// ─── Neighbourhood matcher route ──────────────────────────────────────────────
+app.get("/api/neighbourhood", (req: Request, res: Response) => {
+  const lat = parseFloat(req.query.lat as string);
+  const lng = parseFloat(req.query.lng as string);
+
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: "Missing lat/lng" });
+  }
+
+  const boundaryPath = nodePath.join(
+    __dirname,
+    "datasets",
+    "local-area-boundary.json",
+  );
+
+  const neighbourhood = getNeighbourhoodFromCoords(lat, lng, boundaryPath);
+  if (!neighbourhood) {
+    return res
+      .status(404)
+      .json({ error: "No neighbourhood found for these coordinates" });
+  }
+
+  return res.json({ neighbourhood });
+});
+console.log("Registered GET /api/neighbourhood");
+
+// ─── Report data route ────────────────────────────────────────────────────────
+app.get("/api/report-data", async (req: Request, res: Response) => {
+  const lat = parseFloat(req.query.lat as string);
+  const lng = parseFloat(req.query.lng as string);
+  const radius = parseInt(req.query.radius as string) || 500;
+
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: "Missing lat/lng" });
+  }
+
+  const boundaryPath = nodePath.join(
+    __dirname,
+    "datasets",
+    "local-area-boundary.json",
+  );
+  const neighbourhood = getNeighbourhoodFromCoords(lat, lng, boundaryPath);
+  if (!neighbourhood) {
+    return res
+      .status(404)
+      .json({ error: "Location is outside Vancouver neighbourhoods" });
+  }
+
+  const csvPath = nodePath.join(
+    __dirname,
+    "datasets",
+    "CensusLocalAreaProfiles2016.csv",
+  );
+  const populationResult = getPopulationVulnerability(neighbourhood, csvPath);
+  if (!populationResult) {
+    return res
+      .status(500)
+      .json({ error: `Could not find census data for ${neighbourhood}` });
+  }
+
+  const [heatResult, floodResult] = await Promise.all([
+    getHeatExposureScore(lat, lng, radius),
+    getFloodExposureScore(lat, lng),
+  ]);
+
+  const climateDisruptionScore = Math.round(
+    (heatResult.heatExposureScore + floodResult.floodExposureScore) / 2,
+  );
+
+  return res.json({
+    ...populationResult,
+    heatExposureScore: heatResult.heatExposureScore,
+    floodExposureScore: floodResult.floodExposureScore,
+    inFloodZone: floodResult.inFloodZone,
+    floodZoneName: floodResult.floodZoneName,
+    climateDisruptionScore,
+  });
+});
+console.log("Registered GET /api/report-data");
+
+// ─── Heat exposure route ──────────────────────────────────────────────────────
+app.get("/api/heat-exposure", async (req: Request, res: Response) => {
+  const lat = parseFloat(req.query.lat as string);
+  const lng = parseFloat(req.query.lng as string);
+  const radius = parseInt(req.query.radius as string) || 500;
+
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: "Missing lat/lng" });
+  }
+
+  try {
+    const result = await getHeatExposureScore(lat, lng, radius);
+    return res.json({ lat, lng, radius, ...result });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch heat exposure data" });
+  }
+});
+console.log("Registered GET /api/heat-exposure");
+
+// ─── Flood exposure route ─────────────────────────────────────────────────────
+app.get("/api/flood-exposure", async (req: Request, res: Response) => {
+  const lat = parseFloat(req.query.lat as string);
+  const lng = parseFloat(req.query.lng as string);
+
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: "Missing lat/lng" });
+  }
+
+  try {
+    const result = await getFloodExposureScore(lat, lng);
+    return res.json({ lat, lng, ...result });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch flood exposure data" });
+  }
+});
+console.log("Registered GET /api/flood-exposure");
+
+// ─── 404 + error handlers ─────────────────────────────────────────────────────
+app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: "Not found" });
 });
 
-app.use((err: any, _req: any, res: any, _next: any) => {
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(500).json({ error: "Internal server error" });
 });
 
+// ─── Start server ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-
-function heatExposureScore(
-  outdoorProviders: number,
-  totalProviders: number,
-): number {
-  return outdoorProviders / totalProviders;
-}
-
-function floodExposureScore(inFloodZone: number, totalProviders: number, area: number): number {
-    return (inFloodZone * (totalProviders / area)) / 100;
-}
-
-function populationVulnerabilityScore(populationDetails: object): number {
-  return 0;
-}
-
-function providerDiversityScore(
-  outdoorProviders: number,
-  indoorProviders: number,
-): number {
-  return Math.abs(outdoorProviders - indoorProviders) / 100;
-}
-
-function vulnerabilityScore(
-  hazardExposureScore: number,
-  populationVulnerabilityScore: number,
-  providerDiversityScore: number,
-  floodExposureScore: number,
-): number {
-  const w1: number = 1;
-  const w2: number = 0.9;
-  const w3: number = 0.5;
-  const w4: number = 1;
-
-  return (
-    (w1 * hazardExposureScore + w2 * populationVulnerabilityScore + w3 * providerDiversityScore + w4 * floodExposureScore) / 100
-  );
-}

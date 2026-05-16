@@ -31,8 +31,15 @@ export default function ResultPanel() {
     return null;
   }
 
+  const ratio = indoor > 0 ? outdoor / indoor : null;
   const outdoorIndoorRatio =
-    indoor > 0 ? (outdoor / indoor).toFixed(1) : outdoor > 0 ? "∞" : "N/A";
+    ratio === null
+      ? outdoor > 0
+        ? "∞"
+        : "N/A"
+      : ratio < 0.1
+        ? ratio.toFixed(3)
+        : ratio.toFixed(1);
 
   return (
     <div className="result-panel-container">

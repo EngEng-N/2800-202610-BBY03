@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Search, User, MapPin } from "lucide-react";
 import { Joyride } from "react-joyride";
 import type { Step } from "react-joyride";
+import { useNavigate } from "react-router-dom";
 
 {
   /*
@@ -17,6 +18,7 @@ const url = "http://localhost:3000";
 type AppStep = "M1" | "M2" | "M3" | "M4";
 
 export default function MapPage() {
+  const navigate = useNavigate();
   const [step, setStep] = useState<AppStep>("M1");
   const [radius, setRadius] = useState(250);
   const [location, setLocation] = useState<string>(
@@ -283,12 +285,25 @@ export default function MapPage() {
             onClick={async () => {
               if (!coords) return;
               setStep("M4");
-              const res = await fetch(
-                `/api/report-data?lat=${coords.lat}&lng=${coords.lng}`,
-              );
-              const data = await res.json();
-              console.log(data); // we'll replace this with navigation to report page next
-              setStep("M3"); // temporary — will navigate to report page instead
+              try {
+                const [res, outdoorCount, indoorCount] = await Promise.all([
+                  fetch(
+                    `/api/report-data?lat=${coords.lat}&lng=${coords.lng}&radius=${radius}`,
+                  ),
+                  getOutdoorCount(coords.lat, coords.lng, radius),
+                  getIndoorCount(coords.lat, coords.lng, radius),
+                ]);
+                const data = await res.json();
+                navigate("/results", {
+                  state: {
+                    report: data,
+                    outdoor: outdoorCount,
+                    indoor: indoorCount,
+                  },
+                });
+              } catch {
+                setStep("M3");
+              }
             }}
             className="w-full bg-blue-500 hover:bg-blue-600 active:scale-95 transition-all text-white font-semibold py-4 rounded-full text-base generate-button"
           >
@@ -359,4 +374,44 @@ async function indoorVendorCall(
   );
 
   setIndoor(totals.reduce((sum, count) => sum + count, 0));
+}
+
+async function getOutdoorCount(
+  lat: number,
+  lng: number,
+  radius: number,
+): Promise<number> {
+  const sources = ["community-gardens-and-food-trees", "food-vendors"];
+  const totals = await Promise.all(
+    sources.map(async (path) => {
+      const response = await fetch(
+        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
+      );
+      const data = await response.json();
+      return Number(data.total_count ?? 0);
+    }),
+  );
+  return totals.reduce((sum, count) => sum + count, 0);
+}
+
+async function getIndoorCount(
+  lat: number,
+  lng: number,
+  radius: number,
+): Promise<number> {
+  const sources = [
+    "free-low-cost-food",
+    "food-related-businesses",
+    "restaurants",
+  ];
+  const totals = await Promise.all(
+    sources.map(async (path) => {
+      const response = await fetch(
+        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
+      );
+      const data = await response.json();
+      return Number(data.total_count ?? 0);
+    }),
+  );
+  return totals.reduce((sum, count) => sum + count, 0);
 }

@@ -1,7 +1,7 @@
-import { getPopulationVulnerability } from "./populationVulnerability";
-import { getNeighbourhoodFromCoords } from "./neighbourhoodMatcher";
-import { getHeatExposureScore } from "./heatExposureScore";
-import { getFloodExposureScore } from "./floodExposureScore";
+import { getPopulationVulnerability } from "./helpers/populationVulnerability";
+import { getNeighbourhoodFromCoords } from "./helpers/neighbourhoodMatcher";
+import { getHeatExposureScore } from "./helpers/heatExposureScore";
+import { getFloodExposureScore } from "./helpers/floodExposureScore";
 import express, {
   type NextFunction,
   type Request,

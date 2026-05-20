@@ -54,12 +54,17 @@ export default function LandingPage() {
 
             </div>
 
-            {/* Proceed button */}
-            <div className="relative w-full max-w-sm mx-auto z-10">
+            {/* Auth buttons */}
+            <div className="relative w-full max-w-sm mx-auto z-10 flex flex-col gap-3">
                 <button
-                    onClick={() => navigate('/map')}
+                    onClick={() => navigate('/signup')}
                     className="w-full bg-white text-black font-semibold text-lg py-4 rounded-full shadow-lg hover:bg-white/90 active:scale-95 transition-all duration-200">
-                    Get Started For Free
+                    Sign Up
+                </button>
+                <button
+                    onClick={() => navigate('/login')}
+                    className="w-full bg-transparent text-white font-semibold text-lg py-4 rounded-full border border-white/70 hover:bg-white/10 active:scale-95 transition-all duration-200">
+                    Log In
                 </button>
             </div>
         </div>

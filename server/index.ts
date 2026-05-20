@@ -2,20 +2,20 @@ import { getPopulationVulnerability } from "./helpers/populationVulnerability";
 import { getNeighbourhoodFromCoords } from "./helpers/neighbourhoodMatcher";
 import { getHeatExposureScore } from "./helpers/heatExposureScore";
 import { getFloodExposureScore } from "./helpers/floodExposureScore";
+import "dotenv/config";
 import express, {
   type NextFunction,
   type Request,
   type Response,
 } from "express";
-// import "dotenv/config";
-// import session from "express-session";
-// import MongoStore from "connect-mongo";
+import session from "express-session";
+import MongoStore from "connect-mongo";
 
 import datasetRouter from "./routes/datasets";
 import reportRouter from "./routes/report";
 import summaryRouter from "./routes/summary";
-// import authRouter from "./routes/auth";
-// import { mongoUri, mongoDbName } from "./helpers/mongo";
+import authRouter from "./routes/auth";
+import { mongoUri } from "./helpers/mongo";
 
 import fs from "fs";
 import nodePath from "path";
@@ -47,27 +47,28 @@ for (const { path, url } of openVancouver) {
   console.log(`Registered GET ${path}`);
 }
 
-// app.use(
-//   session({
-//     secret: process.env.SESSION_SECRET ?? "dev-secret-change-me",
-//     resave: false,
-//     saveUninitialized: false,
-//     store: MongoStore.create({
-//       mongoUrl: mongoUri,
-//       dbName: mongoDbName,
-//       collectionName: "sessions",
-//       crypto: {
-//         secret: process.env.SESSION_CRYPTO_SECRET ?? "dev-crypto-change-me",
-//       },
-//     }),
-//     cookie: {
-//       httpOnly: true,
-//       maxAge: 1000 * 60 * 60 * 24 * 7,
-//     },
-//   }),
-// );
+app.use(
+  session({
+    secret: process.env.NODE_SESSION_SECRET ?? "dev-secret-change-me",
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: mongoUri,
+      dbName: process.env.MONGODB_SESSION_DB ?? "session",
+      collectionName: "sessions",
+      crypto: {
+        secret:
+          process.env.MONGODB_SESSION_SECRET ?? "dev-crypto-change-me",
+      },
+    }),
+    cookie: {
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60 * 24 * 7,
+    },
+  }),
+);
 
-// app.use('/api/auth', authRouter);
+app.use("/api/auth", authRouter);
 app.use("/api/datasets", datasetRouter);
 app.use("/api/report-data", reportRouter);
 app.use("/api/summary", summaryRouter);

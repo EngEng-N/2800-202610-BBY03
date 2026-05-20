@@ -1,12 +1,21 @@
 import { MongoClient, type Db, type Collection } from "mongodb";
 
-const uri = process.env.MONGODB_URI;
-if (!uri) {
-  throw new Error("MONGODB_URI environment variable is required");
+function buildUri(): string {
+  if (process.env.MONGODB_URI) return process.env.MONGODB_URI;
+  const user = process.env.MONGODB_USER;
+  const password = process.env.MONGODB_PASSWORD;
+  const host = process.env.MONGODB_HOST;
+  if (!user || !password || !host) {
+    throw new Error(
+      "MONGODB_URI or MONGODB_USER/MONGODB_PASSWORD/MONGODB_HOST must be set",
+    );
+  }
+  return `mongodb+srv://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}/?retryWrites=true&w=majority`;
 }
 
+const uri = buildUri();
 const client = new MongoClient(uri);
-const dbName = process.env.MONGODB_DB ?? "app";
+const dbName = process.env.MONGODB_USERS_DB ?? process.env.MONGODB_DB ?? "app";
 
 let connectPromise: Promise<MongoClient> | null = null;
 

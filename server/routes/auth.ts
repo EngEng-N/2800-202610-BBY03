@@ -93,6 +93,27 @@ router.post("/logout", (req, res, next) => {
   });
 });
 
+router.delete("/me", async (req, res, next) => {
+  try {
+    if (!req.session.userId) {
+      res.status(401).json({ error: "Not authenticated" });
+      return;
+    }
+    const users = await getUsers();
+    await users.deleteOne({ _id: new ObjectId(req.session.userId) });
+    req.session.destroy((err) => {
+      if (err) {
+        next(err);
+        return;
+      }
+      res.clearCookie("connect.sid");
+      res.json({ ok: true });
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get("/me", async (req, res, next) => {
   try {
     if (!req.session.userId) {

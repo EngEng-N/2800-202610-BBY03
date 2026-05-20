@@ -1,4 +1,5 @@
 import "./ResultPanel.css";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 interface ReportData {
@@ -26,10 +27,25 @@ export default function ResultPanel() {
   const outdoor = (location.state?.outdoor as number) ?? 0;
   const indoor = (location.state?.indoor as number) ?? 0;
 
+  const [areaName, setAreaName] = useState("");
+
   if (!report) {
     navigate("/map");
     return null;
   }
+
+  const handleDownload = () => {
+    const filename = areaName.trim() || report.neighbourhood;
+    const blob = new Blob([JSON.stringify(report, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${filename}-report.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const ratio = indoor > 0 ? outdoor / indoor : null;
   const outdoorIndoorRatio =
@@ -102,8 +118,13 @@ export default function ResultPanel() {
           type="text"
           placeholder="Enter area name"
           className="area-input"
+          value={areaName}
+          onChange={(e) => setAreaName(e.target.value)}
         />
         <button className="save-button">Save</button>
+        <button className="download-button" onClick={handleDownload}>
+          Download JSON
+        </button>
       </div>
     </div>
   );

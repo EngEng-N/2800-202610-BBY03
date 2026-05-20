@@ -65,6 +65,7 @@ export default function ResultPanel() {
           <span>{scoreToStars(report.floodExposureScore)}</span>
         </div>
       </div>
+
       <div className="population">
         <span className="population-label label">Population</span>
         <div className="senior-container sub-container">
@@ -80,6 +81,7 @@ export default function ResultPanel() {
           <span>{scoreToStars(report.renterPercent * 2)}</span>
         </div>
       </div>
+
       <div className="food-diversity">
         <span className="food-diversity-label label">Food Diversity</span>
         <div className="ratio-container sub-container">
@@ -87,12 +89,14 @@ export default function ResultPanel() {
           <span>{outdoorIndoorRatio}</span>
         </div>
       </div>
+
       <div className="overall">
         <div className="overall-container">
           <p className="overall-label label">Overall Vulnerability Rating</p>
           <span>{scoreToStars(report.populationVulnerabilityScore)}</span>
         </div>
       </div>
+
       <div className="button-container">
         <input
           type="text"

@@ -1,9 +1,7 @@
-import "./env";
-import { getPopulationVulnerability } from "./helpers/populationVulnerability";
-import { getNeighbourhoodFromCoords } from "./helpers/neighbourhoodMatcher";
-import { getHeatExposureScore } from "./helpers/heatExposureScore";
-import { getFloodExposureScore } from "./helpers/floodExposureScore";
-import "dotenv/config";
+import { getPopulationVulnerability } from "./vulnerability/populationVulnerability";
+import { getNeighbourhoodFromCoords } from "./vulnerability/neighbourhoodMatcher";
+import { getHeatExposureScore } from "./vulnerability/heatExposureScore";
+import { getFloodExposureScore } from "./vulnerability/floodExposureScore";
 import express, {
   type NextFunction,
   type Request,
@@ -38,8 +36,7 @@ app.use(
       dbName: getSessionDbName(),
       collectionName: "sessions",
       crypto: {
-        secret:
-          process.env.MONGODB_SESSION_SECRET ?? "dev-crypto-change-me",
+        secret: process.env.MONGODB_SESSION_SECRET ?? "dev-crypto-change-me",
       },
     }),
     cookie: {
@@ -184,58 +181,86 @@ app.get("/api/neighbourhood", (req: Request, res: Response) => {
 console.log("Registered GET /api/neighbourhood");
 
 // ─── Report data route ────────────────────────────────────────────────────────
-app.get("/api/report-data", async (req: Request, res: Response) => {
-  const lat = parseFloat(req.query.lat as string);
-  const lng = parseFloat(req.query.lng as string);
-  const radius = parseInt(req.query.radius as string) || 500;
+// app.get("/api/report-data", async (req: Request, res: Response) => {
+//   const lat = parseFloat(req.query.lat as string);
+//   const lng = parseFloat(req.query.lng as string);
+//   const radius = parseInt(req.query.radius as string) || 500;
 
-  if (isNaN(lat) || isNaN(lng)) {
-    return res.status(400).json({ error: "Missing lat/lng" });
-  }
+//   if (isNaN(lat) || isNaN(lng)) {
+//     return res.status(400).json({ error: "Missing lat/lng" });
+//   }
 
-  const boundaryPath = nodePath.join(
-    __dirname,
-    "datasets",
-    "local-area-boundary.json",
-  );
-  const neighbourhood = getNeighbourhoodFromCoords(lat, lng, boundaryPath);
-  if (!neighbourhood) {
-    return res
-      .status(404)
-      .json({ error: "Location is outside Vancouver neighbourhoods" });
-  }
+//   const boundaryPath = nodePath.join(
+//     __dirname,
+//     "datasets",
+//     "local-area-boundary.json",
+//   );
+//   const neighbourhood = getNeighbourhoodFromCoords(lat, lng, boundaryPath);
+//   if (!neighbourhood) {
+//     return res
+//       .status(404)
+//       .json({ error: "Location is outside Vancouver neighbourhoods" });
+//   }
 
-  const csvPath = nodePath.join(
-    __dirname,
-    "datasets",
-    "CensusLocalAreaProfiles2016.csv",
-  );
-  const populationResult = getPopulationVulnerability(neighbourhood, csvPath);
-  if (!populationResult) {
-    return res
-      .status(500)
-      .json({ error: `Could not find census data for ${neighbourhood}` });
-  }
+//   const csvPath = nodePath.join(
+//     __dirname,
+//     "datasets",
+//     "CensusLocalAreaProfiles2016.csv",
+//   );
+//   const populationResult = getPopulationVulnerability(neighbourhood, csvPath);
+//   if (!populationResult) {
+//     return res
+//       .status(500)
+//       .json({ error: `Could not find census data for ${neighbourhood}` });
+//   }
 
-  const [heatResult, floodResult] = await Promise.all([
-    getHeatExposureScore(lat, lng, radius),
-    getFloodExposureScore(lat, lng),
-  ]);
+//   const [heatResult, floodResult] = await Promise.all([
+//     getHeatExposureScore(lat, lng, radius),
+//     getFloodExposureScore(lat, lng),
+//   ]);
 
-  const climateDisruptionScore = Math.round(
-    (heatResult.heatExposureScore + floodResult.floodExposureScore) / 2,
-  );
+//   const climateDisruptionScore = Math.round(
+//     (heatResult.heatExposureScore + floodResult.floodExposureScore) / 2,
+//   );
 
-  return res.json({
-    ...populationResult,
-    heatExposureScore: heatResult.heatExposureScore,
-    floodExposureScore: floodResult.floodExposureScore,
-    inFloodZone: floodResult.inFloodZone,
-    floodZoneName: floodResult.floodZoneName,
-    climateDisruptionScore,
-  });
-});
-console.log("Registered GET /api/report-data");
+//   return res.json({
+//     neighbourhood: populationResult.neighbourhood,
+//     coords: { lat, lng },
+//     radiusM: radius,
+//     areaKm2:
+//       Math.round(((Math.PI * Math.pow(radius, 2)) / 1_000_000) * 100) / 100,
+//     population: {
+//       seniorsPercent: populationResult.seniorsPercent,
+//       lowIncomePercent: populationResult.lowIncomePercent,
+//       renterPercent: populationResult.renterPercent,
+//       populationVulnerabilityScore:
+//         populationResult.populationVulnerabilityScore,
+//     },
+//     vendors: {
+//       outdoor: 0, // TB fills this in from dataset router
+//       indoor: 0,
+//     },
+//     scores: {
+//       heatExposureScore: heatResult.heatExposureScore,
+//       floodExposureScore: floodResult.floodExposureScore,
+//       climateDisruptionScore,
+//       populationVulnerabilityScore:
+//         populationResult.populationVulnerabilityScore,
+//     },
+//     stars: {
+//       heat: Math.round((heatResult.heatExposureScore / 100) * 5),
+//       flood: Math.round((floodResult.floodExposureScore / 100) * 5),
+//       seniors: Math.round((populationResult.seniorsScore / 100) * 5),
+//       income: Math.round((populationResult.lowIncomeScore / 100) * 5),
+//       renters: Math.round((populationResult.renterScore / 100) * 5),
+//       diversity: 0,
+//       overall: 0,
+//     },
+//     inFloodZone: floodResult.inFloodZone,
+//     floodZoneName: floodResult.floodZoneName,
+//   });
+// });
+// console.log("Registered GET /api/report-data");
 
 // ─── Heat exposure route ──────────────────────────────────────────────────────
 app.get("/api/heat-exposure", async (req: Request, res: Response) => {

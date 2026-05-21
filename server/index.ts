@@ -3,6 +3,7 @@ import { getPopulationVulnerability } from "./helpers/populationVulnerability";
 import { getNeighbourhoodFromCoords } from "./helpers/neighbourhoodMatcher";
 import { getHeatExposureScore } from "./helpers/heatExposureScore";
 import { getFloodExposureScore } from "./helpers/floodExposureScore";
+import "dotenv/config";
 import express, {
   type NextFunction,
   type Request,

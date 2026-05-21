@@ -44,7 +44,7 @@ p {
   font-size: 14px;
   color: #d8d8d8;
   font-weight: 500;
-  padding-right: 1rem;
+  /* padding-right: 1rem; */
 }
 
 .climate-disurbance,
@@ -99,4 +99,23 @@ p {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+}
+
+.save-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.save-feedback {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.save-feedback.success {
+  color: #22c55e;
+}
+
+.save-feedback.error {
+  color: #ef4444;
 }

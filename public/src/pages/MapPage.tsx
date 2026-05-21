@@ -158,6 +158,9 @@ export default function MapPage() {
           report: data,
           outdoor: outdoorCount,
           indoor: indoorCount,
+          lat: coords.lat,
+          lng: coords.lng,
+          radius,
         },
       });
     } catch (error) {

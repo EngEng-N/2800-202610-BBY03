@@ -355,7 +355,7 @@ export default function ResultPanel() {
             setAreaName(e.target.value);
             if (saveState !== "idle") {
               setSaveState("idle");
-              setSaveMessage("");
+              // setSaveMessage("");
             }
           }}
         />

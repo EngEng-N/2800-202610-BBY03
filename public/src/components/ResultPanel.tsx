@@ -44,6 +44,107 @@ function renderStars(stars: number): string {
   return "★".repeat(s) + "☆".repeat(5 - s);
 }
 
+function formatPercent(value: number): string {
+  return `${value.toFixed(1)}%`;
+}
+
+function formatScore(value?: number): string {
+  return typeof value === "number" ? `${Math.round(value)}/100` : "N/A";
+}
+
+function buildDownloadReport(
+  report: ReportData,
+  areaName: string,
+  outdoor: number,
+  indoor: number,
+) {
+  const trimmedName = areaName.trim();
+  const displayAreaName = trimmedName || report.neighbourhood;
+  const ratio = indoor > 0 ? outdoor / indoor : null;
+
+  const outdoorIndoorRatio =
+    indoor === 0
+      ? "N/A"
+      : outdoor === 0
+        ? "N/A"
+        : ratio !== null && ratio < 0.1
+          ? ratio.toFixed(3)
+          : ratio !== null
+            ? ratio.toFixed(1)
+            : "N/A";
+
+  const ratioNote =
+    indoor === 0
+      ? outdoor > 0
+        ? "Only outdoor vendors were found in this area."
+        : "No indoor or outdoor vendors were found in this area."
+      : outdoor === 0
+        ? "Only indoor vendors were found in this area."
+        : "Both indoor and outdoor vendors were found in this area.";
+
+  return {
+    reportTitle: `${displayAreaName} Food Vulnerability Report`,
+    generatedAt: new Date().toISOString(),
+
+    area: {
+      selectedAreaName: displayAreaName,
+      neighbourhood: report.neighbourhood,
+      coordinates: {
+        latitude: report.coords.lat,
+        longitude: report.coords.lng,
+      },
+      analysisRadiusMeters: report.radiusM,
+      analysisAreaSquareKm: report.areaKm2,
+    },
+
+    climateDisturbance: {
+      heatwave: {
+        score: formatScore(report.scores.heatExposureScore),
+        rating: renderStars(report.stars.heat),
+      },
+      flood: {
+        inFloodZone: report.inFloodZone ? "Yes" : "No",
+        floodZoneName: report.floodZoneName ?? "None",
+        score: formatScore(report.scores.floodExposureScore),
+        rating: renderStars(report.stars.flood),
+      },
+      climateDisruptionScore: formatScore(report.scores.climateDisruptionScore),
+    },
+
+    population: {
+      seniors: {
+        percentage: formatPercent(report.population.seniorsPercent),
+        rating: renderStars(report.stars.seniors),
+      },
+      lowIncome: {
+        percentage: formatPercent(report.population.lowIncomePercent),
+        rating: renderStars(report.stars.income),
+      },
+      renters: {
+        percentage: formatPercent(report.population.renterPercent),
+        rating: renderStars(report.stars.renters),
+      },
+      populationVulnerabilityScore: formatScore(
+        report.population.populationVulnerabilityScore,
+      ),
+    },
+
+    foodDiversity: {
+      outdoorVendors: outdoor,
+      indoorVendors: indoor,
+      outdoorIndoorRatio,
+      ratioNote,
+      providerDiversityScore: formatScore(report.scores.providerDiversityScore),
+      diversityRating: renderStars(report.stars.diversity),
+    },
+
+    overallVulnerability: {
+      overallScore: formatScore(report.scores.overallVulnerabilityScore),
+      overallRating: renderStars(report.stars.overall),
+    },
+  };
+}
+
 export default function ResultPanel() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -66,15 +167,27 @@ export default function ResultPanel() {
   if (!report) return null;
 
   const handleDownload = () => {
-    const filename = areaName.trim() || report.neighbourhood;
-    const blob = new Blob([JSON.stringify(report, null, 2)], {
+    const filename = (areaName.trim() || report.neighbourhood)
+      .replace(/\s+/g, "-")
+      .toLowerCase();
+
+    const downloadReport = buildDownloadReport(
+      report,
+      areaName,
+      outdoor,
+      indoor,
+    );
+    const blob = new Blob([JSON.stringify(downloadReport, null, 2)], {
       type: "application/json",
     });
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `${filename}-report.json`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 

@@ -1,3 +1,4 @@
+import "./env";
 import { getPopulationVulnerability } from "./vulnerability/populationVulnerability";
 import { getNeighbourhoodFromCoords } from "./vulnerability/neighbourhoodMatcher";
 import { getHeatExposureScore } from "./vulnerability/heatExposureScore";

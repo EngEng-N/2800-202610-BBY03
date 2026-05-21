@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, LogOut, Trash2, User as UserIcon } from 'lucide-react'
+import { ArrowLeft, Bookmark, LogOut, Trash2, User as UserIcon } from 'lucide-react'
 
 type Me = { _id: string; username: string; createdAt?: string }
 
@@ -69,7 +69,7 @@ export default function AccountPage() {
         <div className="min-h-screen w-full bg-[#1a1a2e] text-white flex flex-col">
             <div className="flex items-center gap-3 px-4 pt-10 pb-4">
                 <button
-                    onClick={() => navigate(-1)}
+                    onClick={() => navigate('/map')}
                     className="bg-[#2a2a3e] p-3 rounded-2xl"
                     aria-label="Back"
                 >
@@ -96,6 +96,15 @@ export default function AccountPage() {
                         {error && (
                             <p className="text-red-300 text-sm text-center">{error}</p>
                         )}
+
+                        <button
+                            onClick={() => navigate('/saved-locations')}
+                            disabled={busy}
+                            className="w-full bg-[#2a2a3e] hover:bg-[#33334a] active:scale-95 transition-all rounded-2xl px-5 py-4 flex items-center gap-3 disabled:opacity-60"
+                        >
+                            <Bookmark size={18} />
+                            <span className="font-medium">Saved locations</span>
+                        </button>
 
                         <button
                             onClick={handleLogout}

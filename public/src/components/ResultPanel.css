@@ -117,6 +117,30 @@ p {
   color: #e8e8e8;
 }
 
+.view-saved-button {
+  margin-top: 12px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid #3a3d42;
+  border-radius: 8px;
+  padding: 10px;
+  color: #c8c8c8;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.view-saved-button:hover {
+  background: #2a2d32;
+  color: #fff;
+}
+
+.save-error {
+  margin-top: 8px;
+  color: #f87171;
+  font-size: 12px;
+  text-align: center;
+}
+
 .save-button:disabled {
   opacity: 0.7;
   cursor: not-allowed;

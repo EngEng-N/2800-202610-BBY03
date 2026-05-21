@@ -50,18 +50,13 @@ export default function MapPage() {
         setIndoor(0);
         setReportError("");
 
-        outdoorVendorCall(
-          selectedLat,
-          selectedLng,
-          radiusRef.current,
-          setOutdoor,
-        );
-        indoorVendorCall(
-          selectedLat,
-          selectedLng,
-          radiusRef.current,
-          setIndoor,
-        );
+        Promise.all([
+          getOutdoorCount(selectedLat, selectedLng, radiusRef.current),
+          getIndoorCount(selectedLat, selectedLng, radiusRef.current),
+        ]).then(([o, i]) => {
+          setOutdoor(o);
+          setIndoor(i);
+        });
 
         try {
           const res = await fetch(
@@ -91,8 +86,13 @@ export default function MapPage() {
     setIndoor(0);
     setReportError("");
 
-    outdoorVendorCall(coords.lat, coords.lng, radius, setOutdoor);
-    indoorVendorCall(coords.lat, coords.lng, radius, setIndoor);
+    Promise.all([
+      getOutdoorCount(coords.lat, coords.lng, radius),
+      getIndoorCount(coords.lat, coords.lng, radius),
+    ]).then(([o, i]) => {
+      setOutdoor(o);
+      setIndoor(i);
+    });
   }, [coords, radius]);
 
   const tourSteps: Step[] = [
@@ -351,32 +351,6 @@ async function fetchVendorCount(
   );
 
   return totals.reduce((sum, count) => sum + count, 0);
-}
-
-async function outdoorVendorCall(
-  lat: number,
-  lng: number,
-  radius: number,
-  setOutdoor: React.Dispatch<React.SetStateAction<number>>,
-) {
-  const sources = ["community-gardens-and-food-trees", "food-vendors"];
-  const total = await fetchVendorCount(sources, lat, lng, radius);
-  setOutdoor(total);
-}
-
-async function indoorVendorCall(
-  lat: number,
-  lng: number,
-  radius: number,
-  setIndoor: React.Dispatch<React.SetStateAction<number>>,
-) {
-  const sources = [
-    "free-low-cost-food",
-    "food-related-businesses",
-    "restaurants",
-  ];
-  const total = await fetchVendorCount(sources, lat, lng, radius);
-  setIndoor(total);
 }
 
 async function getOutdoorCount(

@@ -15,6 +15,7 @@ import datasetRouter from "./routes/datasets";
 import reportRouter from "./routes/report";
 import summaryRouter from "./routes/summary";
 import authRouter from "./routes/auth";
+import savedLocationsRouter from "./routes/savedLocations";
 import { getMongoUri, getSessionDbName } from "./helpers/mongo";
 
 import fs from "fs";
@@ -67,6 +68,7 @@ for (const { path, url } of openVancouver) {
 }
 
 app.use("/api/auth", authRouter);
+app.use("/api/saved-locations", savedLocationsRouter);
 app.use("/api/datasets", datasetRouter);
 app.use("/api/report-data", reportRouter);
 app.use("/api/summary", summaryRouter);

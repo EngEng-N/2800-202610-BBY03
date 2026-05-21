@@ -4,6 +4,8 @@ import MapPage from "./pages/MapPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import AccountPage from "./pages/AccountPage";
+import SavedLocationsPage from "./pages/SavedLocationsPage";
+import SavedLocationDetailPage from "./pages/SavedLocationDetailPage";
 import ResultPanel from "./components/ResultPanel";
 
 function App() {
@@ -14,6 +16,8 @@ function App() {
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/map" element={<MapPage />} />
       <Route path="/account" element={<AccountPage />} />
+      <Route path="/saved-locations" element={<SavedLocationsPage />} />
+      <Route path="/saved-locations/:id" element={<SavedLocationDetailPage />} />
       <Route path="/results" element={<ResultPanel />} />
     </Routes>
   );

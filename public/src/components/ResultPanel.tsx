@@ -26,13 +26,78 @@ export default function ResultPanel() {
   const report = location.state?.report as ReportData | undefined;
   const outdoor = (location.state?.outdoor as number) ?? 0;
   const indoor = (location.state?.indoor as number) ?? 0;
+  const lat = location.state?.lat as number | undefined;
+  const lng = location.state?.lng as number | undefined;
+  const radius = location.state?.radius as number | undefined;
 
   const [areaName, setAreaName] = useState("");
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   if (!report) {
     navigate("/map");
     return null;
   }
+
+  const handleSave = async () => {
+    if (!report || typeof lat !== "number" || typeof lng !== "number") {
+      setSaveError("Missing location data.");
+      setSaveState("error");
+      return;
+    }
+    const name = areaName.trim() || report.neighbourhood;
+    setSaveState("saving");
+    setSaveError(null);
+    try {
+      let summary: string | null = null;
+      try {
+        const sumRes = await fetch("/api/summary", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            report: { ...report, outdoor, indoor, lat, lng, radius },
+          }),
+        });
+        if (sumRes.ok) {
+          const data = await sumRes.json();
+          summary = data.summary ?? null;
+        }
+      } catch {
+        // non-fatal: save without summary
+      }
+
+      const res = await fetch("/api/saved-locations", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          lat,
+          lng,
+          radius,
+          report,
+          outdoor,
+          indoor,
+          summary,
+        }),
+      });
+      if (res.status === 401) {
+        navigate("/login");
+        return;
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSaveError(data.error ?? "Could not save.");
+        setSaveState("error");
+        return;
+      }
+      setSaveState("saved");
+    } catch {
+      setSaveError("Network error. Try again.");
+      setSaveState("error");
+    }
+  };
 
   const handleDownload = () => {
     const filename = areaName.trim() || report.neighbourhood;
@@ -121,11 +186,30 @@ export default function ResultPanel() {
           value={areaName}
           onChange={(e) => setAreaName(e.target.value)}
         />
-        <button className="save-button">Save</button>
+        <button
+          className="save-button"
+          onClick={handleSave}
+          disabled={saveState === "saving" || saveState === "saved"}
+        >
+          {saveState === "saving"
+            ? "Saving…"
+            : saveState === "saved"
+              ? "Saved ✓"
+              : "Save"}
+        </button>
         <button className="download-button" onClick={handleDownload}>
           Download JSON
         </button>
       </div>
+      {saveState === "saved" && (
+        <button
+          className="view-saved-button"
+          onClick={() => navigate("/saved-locations")}
+        >
+          View saved locations
+        </button>
+      )}
+      {saveError && <p className="save-error">{saveError}</p>}
     </div>
   );
 }

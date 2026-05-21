@@ -1,21 +1,23 @@
+import "./env";
 import { getPopulationVulnerability } from "./helpers/populationVulnerability";
 import { getNeighbourhoodFromCoords } from "./helpers/neighbourhoodMatcher";
 import { getHeatExposureScore } from "./helpers/heatExposureScore";
 import { getFloodExposureScore } from "./helpers/floodExposureScore";
+import "dotenv/config";
 import express, {
   type NextFunction,
   type Request,
   type Response,
 } from "express";
-// import "dotenv/config";
-// import session from "express-session";
-// import MongoStore from "connect-mongo";
+import session from "express-session";
+import MongoStore from "connect-mongo";
 
 import datasetRouter from "./routes/datasets";
 import reportRouter from "./routes/report";
 import summaryRouter from "./routes/summary";
-// import authRouter from "./routes/auth";
-// import { mongoUri, mongoDbName } from "./helpers/mongo";
+import authRouter from "./routes/auth";
+import savedLocationsRouter from "./routes/savedLocations";
+import { getMongoUri, getSessionDbName } from "./helpers/mongo";
 
 import fs from "fs";
 import nodePath from "path";
@@ -26,7 +28,27 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use("/api/datasets", datasetRouter);
+
+app.use(
+  session({
+    secret: process.env.NODE_SESSION_SECRET ?? "dev-secret-change-me",
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: getMongoUri(),
+      dbName: getSessionDbName(),
+      collectionName: "sessions",
+      crypto: {
+        secret:
+          process.env.MONGODB_SESSION_SECRET ?? "dev-crypto-change-me",
+      },
+    }),
+    cookie: {
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60 * 24 * 7,
+    },
+  }),
+);
 
 // ─── Open Vancouver API proxy routes ─────────────────────────────────────────
 const openVancouver: { path: string; url: string }[] = routes.openVancouver;
@@ -47,27 +69,8 @@ for (const { path, url } of openVancouver) {
   console.log(`Registered GET ${path}`);
 }
 
-// app.use(
-//   session({
-//     secret: process.env.SESSION_SECRET ?? "dev-secret-change-me",
-//     resave: false,
-//     saveUninitialized: false,
-//     store: MongoStore.create({
-//       mongoUrl: mongoUri,
-//       dbName: mongoDbName,
-//       collectionName: "sessions",
-//       crypto: {
-//         secret: process.env.SESSION_CRYPTO_SECRET ?? "dev-crypto-change-me",
-//       },
-//     }),
-//     cookie: {
-//       httpOnly: true,
-//       maxAge: 1000 * 60 * 60 * 24 * 7,
-//     },
-//   }),
-// );
-
-// app.use('/api/auth', authRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/saved-locations", savedLocationsRouter);
 app.use("/api/datasets", datasetRouter);
 app.use("/api/report-data", reportRouter);
 app.use("/api/summary", summaryRouter);
@@ -279,9 +282,13 @@ app.get("/api/flood-exposure", async (req: Request, res: Response) => {
 });
 console.log("Registered GET /api/flood-exposure");
 
-// ─── 404 + error handlers ─────────────────────────────────────────────────────
-app.use((_req: Request, res: Response) => {
-  res.status(404).json({ error: "Not found" });
+// ─── Serve frontend static files ─────────────────────────────────────────────
+const distPath = nodePath.join(__dirname, "..", "dist");
+app.use(express.static(distPath));
+
+// Catch-all: serve index.html for client-side routing
+app.get("/{*path}", (_req: Request, res: Response) => {
+  res.sendFile(nodePath.join(distPath, "index.html"));
 });
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

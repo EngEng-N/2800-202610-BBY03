@@ -152,9 +152,13 @@ export default function MapPage() {
             className="bg-transparent text-white placeholder-white/40 outline-none w-full text-sm"
           />
         </div>
-        <div className="bg-[#2a2a3e] p-3 rounded-2xl">
+        <button
+          onClick={() => navigate("/account")}
+          className="bg-[#2a2a3e] p-3 rounded-2xl active:scale-95 transition-transform"
+          aria-label="Account"
+        >
           <User size={18} className="text-white" />
-        </div>
+        </button>
       </div>
 
       {/* Map iframe - loads the map.html Thor made */}
@@ -299,6 +303,9 @@ export default function MapPage() {
                     report: data,
                     outdoor: outdoorCount,
                     indoor: indoorCount,
+                    lat: coords.lat,
+                    lng: coords.lng,
+                    radius,
                   },
                 });
               } catch {

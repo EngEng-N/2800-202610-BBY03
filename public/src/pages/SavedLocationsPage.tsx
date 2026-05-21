@@ -13,8 +13,14 @@ interface SavedLocation {
   indoor?: number;
   report: {
     neighbourhood?: string;
-    populationVulnerabilityScore?: number;
-    climateDisruptionScore?: number;
+    scores?: {
+      population?: number;
+      overall?: number;
+      climateDisruptionScore?: number;
+    };
+    population?: {
+      populationVulnerabilityScore?: number;
+    };
   } | null;
 }
 

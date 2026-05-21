@@ -4,16 +4,44 @@ import { ArrowLeft } from "lucide-react";
 import "../../css/ResultPanel.css";
 
 interface ReportData {
-  neighbourhood: string;
-  seniorsPercent: number;
-  lowIncomePercent: number;
-  renterPercent: number;
-  populationVulnerabilityScore: number;
-  heatExposureScore: number;
-  floodExposureScore: number;
+  neighbourhood: string | null;
+  coords: { lat: number; lng: number };
+  radiusM: number;
+  areaKm2: number;
+  population: {
+    neighbourhood: string;
+    seniorsPercent: number;
+    lowIncomePercent: number;
+    renterPercent: number;
+    seniorsScore: number;
+    lowIncomeScore: number;
+    renterScore: number;
+    populationVulnerabilityScore: number;
+  } | null;
+  vendors: {
+    outdoor: number;
+    indoor: number;
+    ratio: number | null;
+  };
+  scores: {
+    heatExposureScore: number;
+    floodExposureScore: number;
+    climateDisruptionScore: number;
+    heat: number;
+    flood: number;
+    population: number;
+    diversity: number;
+    overall: number;
+  };
+  stars: {
+    heat: number;
+    flood: number;
+    population: number;
+    diversity: number;
+    overall: number;
+  };
   inFloodZone: boolean;
   floodZoneName: string | null;
-  climateDisruptionScore: number;
 }
 
 interface SavedLocation {
@@ -29,10 +57,9 @@ interface SavedLocation {
   report: ReportData | null;
 }
 
-function scoreToStars(score: number | null | undefined): string {
-  const s = typeof score === "number" && Number.isFinite(score) ? score : 0;
-  const stars = Math.max(0, Math.min(5, Math.round((s / 100) * 5)));
-  return "★".repeat(stars) + "☆".repeat(5 - stars);
+function renderStars(count: number): string {
+  const clamped = Math.max(0, Math.min(5, count));
+  return "★".repeat(clamped) + "☆".repeat(5 - clamped);
 }
 
 function fmtPct(n: number | null | undefined): string {
@@ -122,9 +149,43 @@ export default function SavedLocationDetailPage() {
     };
   }, [item, summary, summaryLoading]);
 
+  const buildDownloadReport = (report: ReportData) => ({
+    area: {
+      neighbourhood: report.neighbourhood,
+      coordinates: report.coords,
+      radiusMeters: report.radiusM,
+      areaKm2: report.areaKm2,
+    },
+    climate: {
+      heatExposureScore: report.scores.heatExposureScore,
+      floodExposureScore: report.scores.floodExposureScore,
+      climateDisruptionScore: report.scores.climateDisruptionScore,
+      inFloodZone: report.inFloodZone,
+      floodZoneName: report.floodZoneName,
+    },
+    population: report.population
+      ? {
+          seniorsPercent: report.population.seniorsPercent,
+          lowIncomePercent: report.population.lowIncomePercent,
+          renterPercent: report.population.renterPercent,
+          populationVulnerabilityScore: report.population.populationVulnerabilityScore,
+        }
+      : null,
+    diversity: {
+      outdoorVendors: report.vendors.outdoor,
+      indoorVendors: report.vendors.indoor,
+      ratio: report.vendors.ratio,
+      diversityScore: report.scores.diversity,
+    },
+    overall: {
+      score: report.scores.overall,
+      stars: report.stars.overall,
+    },
+  });
+
   const handleDownload = () => {
     if (!item?.report) return;
-    const blob = new Blob([JSON.stringify(item.report, null, 2)], {
+    const blob = new Blob([JSON.stringify(buildDownloadReport(item.report), null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -159,17 +220,19 @@ export default function SavedLocationDetailPage() {
   }
 
   const report = item.report;
-  const outdoor = item.outdoor ?? 0;
-  const indoor = item.indoor ?? 0;
-  const ratio = indoor > 0 ? outdoor / indoor : null;
-  const outdoorIndoorRatio =
+  const outdoor = report.vendors?.outdoor ?? item.outdoor ?? 0;
+  const indoor = report.vendors?.indoor ?? item.indoor ?? 0;
+  const ratio = report.vendors?.ratio ?? null;
+  const ratioNote =
     ratio === null
       ? outdoor > 0
-        ? "∞"
-        : "N/A"
-      : ratio < 0.1
-        ? ratio.toFixed(3)
-        : ratio.toFixed(1);
+        ? "No indoor vendors — outdoor only"
+        : "No vendors found"
+      : ratio < 0.5
+        ? "Heavily indoor-dependent"
+        : ratio > 2
+          ? "Mostly outdoor sources"
+          : "Balanced mix";
 
   return (
     <div className="min-h-screen bg-[#1a1a2e] text-white">
@@ -207,20 +270,22 @@ export default function SavedLocationDetailPage() {
         <div className="bg-[#2a2a3e] rounded-2xl p-4 grid grid-cols-2 gap-3 text-sm">
           <div>
             <p className="text-white/40 text-xs">Neighbourhood</p>
-            <p className="font-medium">{report.neighbourhood}</p>
+            <p className="font-medium">{report.neighbourhood ?? "—"}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Coordinates</p>
             <p className="font-medium">
-              {typeof item.lat === "number" && typeof item.lng === "number"
-                ? `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`
-                : "—"}
+              {report.coords
+                ? `${report.coords.lat.toFixed(4)}, ${report.coords.lng.toFixed(4)}`
+                : typeof item.lat === "number" && typeof item.lng === "number"
+                  ? `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`
+                  : "—"}
             </p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Radius</p>
             <p className="font-medium">
-              {item.radius ? `${item.radius} m` : "—"}
+              {report.radiusM ? `${report.radiusM} m` : item.radius ? `${item.radius} m` : "—"}
             </p>
           </div>
           <div>
@@ -233,15 +298,15 @@ export default function SavedLocationDetailPage() {
           </div>
           <div>
             <p className="text-white/40 text-xs">Seniors</p>
-            <p className="font-medium">{fmtPct(report.seniorsPercent)}</p>
+            <p className="font-medium">{fmtPct(report.population?.seniorsPercent)}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Low income</p>
-            <p className="font-medium">{fmtPct(report.lowIncomePercent)}</p>
+            <p className="font-medium">{fmtPct(report.population?.lowIncomePercent)}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Renters</p>
-            <p className="font-medium">{fmtPct(report.renterPercent)}</p>
+            <p className="font-medium">{fmtPct(report.population?.renterPercent)}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Outdoor / Indoor vendors</p>
@@ -251,22 +316,22 @@ export default function SavedLocationDetailPage() {
           </div>
           <div>
             <p className="text-white/40 text-xs">Heat score</p>
-            <p className="font-medium">{fmtScore(report.heatExposureScore)}</p>
+            <p className="font-medium">{fmtScore(report.scores?.heatExposureScore)}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Flood score</p>
-            <p className="font-medium">{fmtScore(report.floodExposureScore)}</p>
+            <p className="font-medium">{fmtScore(report.scores?.floodExposureScore)}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Climate disruption</p>
             <p className="font-medium">
-              {fmtScore(report.climateDisruptionScore)}
+              {fmtScore(report.scores?.climateDisruptionScore)}
             </p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Population vulnerability</p>
             <p className="font-medium">
-              {fmtScore(report.populationVulnerabilityScore)}
+              {fmtScore(report.population?.populationVulnerabilityScore)}
             </p>
           </div>
         </div>
@@ -274,7 +339,7 @@ export default function SavedLocationDetailPage() {
         <div className="result-panel-container">
           <div className="result-panel-header">
             <span className="report-area-label">
-              Report Area: {report.neighbourhood}
+              Report Area: {report.neighbourhood ?? "Unknown"}
             </span>
           </div>
           <hr />
@@ -284,11 +349,11 @@ export default function SavedLocationDetailPage() {
             </span>
             <div className="heatwave-container sub-container">
               <p>Heatwave</p>
-              <span>{scoreToStars(report.heatExposureScore)}</span>
+              <span>{renderStars(report.stars?.heat ?? 0)}</span>
             </div>
             <div className="flood-container sub-container">
               <p>Flood</p>
-              <span>{scoreToStars(report.floodExposureScore)}</span>
+              <span>{renderStars(report.stars?.flood ?? 0)}</span>
             </div>
           </div>
 
@@ -296,15 +361,27 @@ export default function SavedLocationDetailPage() {
             <span className="population-label label">Population</span>
             <div className="senior-container sub-container">
               <p>Seniors</p>
-              <span>{scoreToStars(report.seniorsPercent * 2)}</span>
+              <span>{renderStars(report.stars?.population ?? 0)}</span>
             </div>
             <div className="income-container sub-container">
               <p>Income</p>
-              <span>{scoreToStars(report.lowIncomePercent * 2)}</span>
+              <span>
+                {renderStars(
+                  report.population
+                    ? Math.round(report.population.lowIncomeScore / 20)
+                    : 0,
+                )}
+              </span>
             </div>
             <div className="handicap-container sub-container">
               <p>Renters</p>
-              <span>{scoreToStars(report.renterPercent * 2)}</span>
+              <span>
+                {renderStars(
+                  report.population
+                    ? Math.round(report.population.renterScore / 20)
+                    : 0,
+                )}
+              </span>
             </div>
           </div>
 
@@ -312,7 +389,13 @@ export default function SavedLocationDetailPage() {
             <span className="food-diversity-label label">Food Diversity</span>
             <div className="ratio-container sub-container">
               <p>Outdoor - Indoor Ratio</p>
-              <span>{outdoorIndoorRatio}</span>
+              <span>{renderStars(report.stars?.diversity ?? 0)}</span>
+            </div>
+            <div className="ratio-container sub-container">
+              <p style={{ fontSize: "12px", color: "#888" }}>{ratioNote}</p>
+              <span style={{ fontSize: "12px" }}>
+                {outdoor} / {indoor}
+              </span>
             </div>
           </div>
 
@@ -321,7 +404,7 @@ export default function SavedLocationDetailPage() {
               <p className="overall-label label">
                 Overall Vulnerability Rating
               </p>
-              <span>{scoreToStars(report.populationVulnerabilityScore)}</span>
+              <span>{renderStars(report.stars?.overall ?? 0)}</span>
             </div>
           </div>
 

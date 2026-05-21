@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../helpers/mongo";
 
@@ -9,18 +9,17 @@ async function getSavedLocations() {
   return db.collection("savedLocations");
 }
 
-function requireAuth(req: any, res: any): string | null {
+function requireAuth(req: Request, res: Response, next: NextFunction): void {
   if (!req.session?.userId) {
     res.status(401).json({ error: "Not authenticated" });
-    return null;
+    return;
   }
-  return req.session.userId;
+  next();
 }
 
-router.get("/", async (req, res, next) => {
+router.get("/", requireAuth, async (req, res, next) => {
   try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
+    const userId = req.session.userId!;
     const col = await getSavedLocations();
     const items = await col
       .find({ userId })
@@ -32,10 +31,9 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.post("/", async (req, res, next) => {
+router.post("/", requireAuth, async (req, res, next) => {
   try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
+    const userId = req.session.userId!;
 
     const { name, lat, lng, radius, report, outdoor, indoor, summary } =
       req.body ?? {};
@@ -70,12 +68,11 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.delete("/:id", async (req, res, next) => {
+router.delete("/:id", requireAuth, async (req, res, next) => {
   try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
+    const userId = req.session.userId!;
 
-    const { id } = req.params;
+    const id = req.params.id as string;
     if (!ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid id" });
       return;

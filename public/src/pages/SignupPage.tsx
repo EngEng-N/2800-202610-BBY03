@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom'
 export default function SignupPage() {
     const navigate = useNavigate()
     const [username, setUsername] = useState('')
+    const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [confirm, setConfirm] = useState('')
     const [error, setError] = useState<string | null>(null)
@@ -13,8 +14,12 @@ export default function SignupPage() {
         e.preventDefault()
         setError(null)
 
-        if (!username.trim() || !password) {
-            setError('Username and password are required')
+        if (!username.trim() || !email.trim() || !password) {
+            setError('Username, email and password are required')
+            return
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            setError('Please enter a valid email address')
             return
         }
         if (password.length < 8) {
@@ -32,7 +37,11 @@ export default function SignupPage() {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: username.trim(), password }),
+                body: JSON.stringify({
+                    username: username.trim(),
+                    email: email.trim(),
+                    password,
+                }),
             })
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}))
@@ -66,6 +75,14 @@ export default function SignupPage() {
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         autoComplete="username"
+                        className="w-full bg-white/10 text-white placeholder-white/60 border border-white/30 rounded-full px-5 py-3 focus:outline-none focus:border-white"
+                    />
+                    <input
+                        type="email"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        autoComplete="email"
                         className="w-full bg-white/10 text-white placeholder-white/60 border border-white/30 rounded-full px-5 py-3 focus:outline-none focus:border-white"
                     />
                     <input

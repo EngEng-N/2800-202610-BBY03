@@ -12,9 +12,13 @@ interface SavedLocation {
   outdoor?: number;
   indoor?: number;
   report: {
-    neighbourhood?: string;
-    populationVulnerabilityScore?: number;
-    climateDisruptionScore?: number;
+    neighbourhood: string;
+    population?: {
+      populationVulnerabilityScore?: number;
+    };
+    scores?: {
+      climateDisruptionScore?: number;
+    };
   } | null;
 }
 
@@ -29,7 +33,9 @@ export default function SavedLocationsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/saved-locations", { credentials: "include" });
+        const res = await fetch("/api/saved-locations", {
+          credentials: "include",
+        });
         if (res.status === 401) {
           navigate("/login");
           return;
@@ -110,7 +116,8 @@ export default function SavedLocationsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold truncate">{item.name}</p>
                   <p className="text-xs text-white/50 truncate">
-                    {item.report?.neighbourhood ?? `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`}
+                    {item.report?.neighbourhood ??
+                      `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`}
                     {item.radius ? ` · ${item.radius} m` : ""}
                   </p>
                   <p className="text-xs text-white/40 mt-1">

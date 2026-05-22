@@ -1,25 +1,16 @@
 {
   "compilerOptions": {
-    /* File Layout */
     "rootDir": "./src",
     "outDir": "./dist",
-
-    /* Environment Settings */
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "esnext",
     "types": ["node"],
-
-    /* Other Outputs */
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
-
-    /* Stricter Typechecking Options */
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-
-    /* Recommended Options */
     "strict": true,
     "jsx": "react-jsx",
     "verbatimModuleSyntax": true,
@@ -29,5 +20,5 @@
     "skipLibCheck": true,
     "noEmit": false
   },
-  "include": ["frontend/src/**/*"]
+  "include": ["src/**/*"]
 }

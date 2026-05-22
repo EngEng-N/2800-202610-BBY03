@@ -391,6 +391,65 @@ map.on("dblclick", function () {
   }
 });
 
+// --- Legend with layer toggles ---
+const legend = L.control({ position: "bottomright" });
+legend.onAdd = function () {
+  const div = L.DomUtil.create("div", "map-legend");
+  div.style.cssText =
+    "background:rgba(30,33,37,0.92);padding:10px 14px;border-radius:10px;font-size:13px;color:#e8e8e8;box-shadow:0 2px 8px rgba(0,0,0,0.4);min-width:170px;border:1px solid #444;";
+
+  const items = [
+    { label: "Food Programs", color: "#2a81cb", layer: foodProgramsLayer },
+    { label: "Community Gardens", color: "green", layer: commGardensLayer },
+    { label: "Food Businesses", color: "pink", layer: foodBusinessLayer },
+    { label: "Restaurants", color: "red", layer: restaurantsLayer },
+    {
+      label: "Flood Zones",
+      color: "#f84a70",
+      layer: floodplainLayer,
+      isPolygon: true,
+    },
+  ];
+
+  div.innerHTML = `<div style="font-weight:600;margin-bottom:8px;font-size:12px;color:#aaa;letter-spacing:0.5px;">LEGEND - click to toggle</div>`;
+
+  items.forEach(({ label, color, layer, isPolygon }) => {
+    const row = L.DomUtil.create("div", "", div);
+    row.style.cssText =
+      "display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;user-select:none;";
+
+    const icon = L.DomUtil.create("div", "", row);
+    if (isPolygon) {
+      icon.style.cssText = `width:16px;height:16px;border-radius:3px;background:${color};opacity:0.7;border:2px solid #da053a;flex-shrink:0;`;
+    } else {
+      icon.style.cssText = `width:12px;height:12px;border-radius:50%;background:${color};flex-shrink:0;border:2px solid rgba(255,255,255,0.3);`;
+    }
+
+    const text = L.DomUtil.create("span", "", row);
+    text.textContent = label;
+    text.style.cssText = "font-size:13px;";
+
+    let visible = true;
+    row.addEventListener("click", function () {
+      visible = !visible;
+      if (visible) {
+        map.addLayer(layer);
+        icon.style.opacity = "1";
+        text.style.color = "#e8e8e8";
+      } else {
+        map.removeLayer(layer);
+        icon.style.opacity = "0.3";
+        text.style.color = "#666";
+      }
+    });
+  });
+
+  L.DomEvent.disableClickPropagation(div);
+  L.DomEvent.disableScrollPropagation(div);
+  return div;
+};
+legend.addTo(map);
+
 // This connects Daniel's main page slider to this page's slider
 window.addEventListener("message", function (e) {
   if (e.data && e.data.type === "SET_RADIUS") {

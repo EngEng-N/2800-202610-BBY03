@@ -1,28 +1,66 @@
-import { getPopulationVulnerability } from "./helpers/populationVulnerability";
-import { getNeighbourhoodFromCoords } from "./helpers/neighbourhoodMatcher";
-import { getHeatExposureScore } from "./helpers/heatExposureScore";
-import { getFloodExposureScore } from "./helpers/floodExposureScore";
+import "./env";
+import { getPopulationVulnerability } from "./vulnerability/populationVulnerability";
+import { getNeighbourhoodFromCoords } from "./vulnerability/neighbourhoodMatcher";
+import { getHeatExposureScore } from "./vulnerability/heatExposureScore";
+import { getFloodExposureScore } from "./vulnerability/floodExposureScore";
+import "dotenv/config";
 import express, {
   type NextFunction,
   type Request,
   type Response,
 } from "express";
-import "dotenv/config";
-// import session from "express-session";
-// import MongoStore from "connect-mongo";
+import session from "express-session";
+import MongoStore from "connect-mongo";
+import rateLimit from "express-rate-limit";
 
 import datasetRouter from "./routes/datasets";
 import reportRouter from "./routes/report";
 import summaryRouter from "./routes/summary";
-// import authRouter from "./routes/auth";
-// import { mongoUri, mongoDbName } from "./helpers/mongo";
+import authRouter from "./routes/auth";
+import savedLocationsRouter from "./routes/savedLocations";
+import { getMongoUri, getSessionDbName } from "./helpers/mongo";
+
+import fs from "fs";
+import nodePath from "path";
+import routes from "./routes.json";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use("/api/datasets", datasetRouter);
+
+app.use(
+  session({
+    secret: process.env.NODE_SESSION_SECRET ?? "dev-secret-change-me",
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: getMongoUri(),
+      dbName: getSessionDbName(),
+      collectionName: "sessions",
+      crypto: {
+        secret:
+          process.env.MONGODB_SESSION_SECRET ?? "dev-crypto-change-me",
+      },
+    }),
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 1000 * 60 * 60 * 24 * 7,
+    },
+  }),
+);
+
+// ─── Rate limiting on auth routes ───────────────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
 
 // ─── Open Vancouver API proxy routes ─────────────────────────────────────────
 const openVancouver: { path: string; url: string }[] = routes.openVancouver;
@@ -43,30 +81,11 @@ for (const { path, url } of openVancouver) {
   console.log(`Registered GET ${path}`);
 }
 
-// app.use(
-//   session({
-//     secret: process.env.SESSION_SECRET ?? "dev-secret-change-me",
-//     resave: false,
-//     saveUninitialized: false,
-//     store: MongoStore.create({
-//       mongoUrl: mongoUri,
-//       dbName: mongoDbName,
-//       collectionName: "sessions",
-//       crypto: {
-//         secret: process.env.SESSION_CRYPTO_SECRET ?? "dev-crypto-change-me",
-//       },
-//     }),
-//     cookie: {
-//       httpOnly: true,
-//       maxAge: 1000 * 60 * 60 * 24 * 7,
-//     },
-//   }),
-// );
-
-// app.use('/api/auth', authRouter);
-app.use('/api/datasets', datasetRouter);
-app.use('/api/report-data', reportRouter);
-app.use('/api/summary', summaryRouter);
+app.use("/api/auth", authLimiter, authRouter);
+app.use("/api/saved-locations", savedLocationsRouter);
+app.use("/api/datasets", datasetRouter);
+app.use("/api/report-data", reportRouter);
+app.use("/api/summary", summaryRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -178,60 +197,6 @@ app.get("/api/neighbourhood", (req: Request, res: Response) => {
 });
 console.log("Registered GET /api/neighbourhood");
 
-// ─── Report data route ────────────────────────────────────────────────────────
-app.get("/api/report-data", async (req: Request, res: Response) => {
-  const lat = parseFloat(req.query.lat as string);
-  const lng = parseFloat(req.query.lng as string);
-  const radius = parseInt(req.query.radius as string) || 500;
-
-  if (isNaN(lat) || isNaN(lng)) {
-    return res.status(400).json({ error: "Missing lat/lng" });
-  }
-
-  const boundaryPath = nodePath.join(
-    __dirname,
-    "datasets",
-    "local-area-boundary.json",
-  );
-  const neighbourhood = getNeighbourhoodFromCoords(lat, lng, boundaryPath);
-  if (!neighbourhood) {
-    return res
-      .status(404)
-      .json({ error: "Location is outside Vancouver neighbourhoods" });
-  }
-
-  const csvPath = nodePath.join(
-    __dirname,
-    "datasets",
-    "CensusLocalAreaProfiles2016.csv",
-  );
-  const populationResult = getPopulationVulnerability(neighbourhood, csvPath);
-  if (!populationResult) {
-    return res
-      .status(500)
-      .json({ error: `Could not find census data for ${neighbourhood}` });
-  }
-
-  const [heatResult, floodResult] = await Promise.all([
-    getHeatExposureScore(lat, lng, radius),
-    getFloodExposureScore(lat, lng),
-  ]);
-
-  const climateDisruptionScore = Math.round(
-    (heatResult.heatExposureScore + floodResult.floodExposureScore) / 2,
-  );
-
-  return res.json({
-    ...populationResult,
-    heatExposureScore: heatResult.heatExposureScore,
-    floodExposureScore: floodResult.floodExposureScore,
-    inFloodZone: floodResult.inFloodZone,
-    floodZoneName: floodResult.floodZoneName,
-    climateDisruptionScore,
-  });
-});
-console.log("Registered GET /api/report-data");
-
 // ─── Heat exposure route ──────────────────────────────────────────────────────
 app.get("/api/heat-exposure", async (req: Request, res: Response) => {
   const lat = parseFloat(req.query.lat as string);
@@ -275,9 +240,13 @@ app.get("/api/flood-exposure", async (req: Request, res: Response) => {
 });
 console.log("Registered GET /api/flood-exposure");
 
-// ─── 404 + error handlers ─────────────────────────────────────────────────────
-app.use((_req: Request, res: Response) => {
-  res.status(404).json({ error: "Not found" });
+// ─── Serve frontend static files ─────────────────────────────────────────────
+const distPath = nodePath.join(__dirname, "..", "dist");
+app.use(express.static(distPath));
+
+// Catch-all: serve index.html for client-side routing
+app.get("/{*path}", (_req: Request, res: Response) => {
+  res.sendFile(nodePath.join(distPath, "index.html"));
 });
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

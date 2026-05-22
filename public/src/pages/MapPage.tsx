@@ -13,9 +13,32 @@ M3 - Main UI
 */
 }
 
-const url = "http://localhost:3000";
-
 type AppStep = "M1" | "M2" | "M3" | "M4";
+
+const OUTDOOR_SOURCES = ["community-gardens-and-food-trees", "food-vendors"];
+const INDOOR_SOURCES = ["free-low-cost-food", "food-related-businesses", "restaurants"];
+
+async function fetchVendorCount(
+  sources: string[],
+  lat: number,
+  lng: number,
+  radius: number,
+): Promise<number> {
+  const totals = await Promise.all(
+    sources.map(async (path) => {
+      try {
+        const response = await fetch(
+          `/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
+        );
+        const data = await response.json();
+        return Number(data.total_count ?? 0);
+      } catch {
+        return 0;
+      }
+    }),
+  );
+  return totals.reduce((sum, count) => sum + count, 0);
+}
 
 export default function MapPage() {
   const navigate = useNavigate();
@@ -25,6 +48,7 @@ export default function MapPage() {
     "Tap the map to select a location",
   );
   const [runTour, setRunTour] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   // Reference to the iframe so we can talk to the map inside it
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -58,19 +82,10 @@ export default function MapPage() {
         setCoords({ lat: selectedLat, lng: selectedLng });
         setOutdoor(0);
         setIndoor(0);
+        setReportError(null);
 
-        outdoorVendorCall(
-          selectedLat,
-          selectedLng,
-          radiusRef.current,
-          setOutdoor,
-        );
-        indoorVendorCall(
-          selectedLat,
-          selectedLng,
-          radiusRef.current,
-          setIndoor,
-        );
+        fetchVendorCount(OUTDOOR_SOURCES, selectedLat, selectedLng, radiusRef.current).then(setOutdoor);
+        fetchVendorCount(INDOOR_SOURCES, selectedLat, selectedLng, radiusRef.current).then(setIndoor);
 
         // Reverse geocode coordinates to a readable address
         try {
@@ -99,9 +114,47 @@ export default function MapPage() {
     setOutdoor(0);
     setIndoor(0);
 
-    outdoorVendorCall(coords.lat, coords.lng, radius, setOutdoor);
-    indoorVendorCall(coords.lat, coords.lng, radius, setIndoor);
+    fetchVendorCount(OUTDOOR_SOURCES, coords.lat, coords.lng, radius).then(setOutdoor);
+    fetchVendorCount(INDOOR_SOURCES, coords.lat, coords.lng, radius).then(setIndoor);
   }, [coords, radius]);
+
+  const handleGenerateReport = async () => {
+    if (!coords) return;
+    setStep("M4");
+    setReportError(null);
+    try {
+      const [outdoorCount, indoorCount] = await Promise.all([
+        fetchVendorCount(OUTDOOR_SOURCES, coords.lat, coords.lng, radius),
+        fetchVendorCount(INDOOR_SOURCES, coords.lat, coords.lng, radius),
+      ]);
+
+      const res = await fetch(
+        `/api/report-data?lat=${coords.lat}&lng=${coords.lng}&radius=${radius}&outdoor=${outdoorCount}&indoor=${indoorCount}`,
+      );
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error (${res.status})`);
+      }
+
+      const data = await res.json();
+      navigate("/results", {
+        state: {
+          report: data,
+          outdoor: outdoorCount,
+          indoor: indoorCount,
+          lat: coords.lat,
+          lng: coords.lng,
+          radius,
+        },
+      });
+    } catch (err) {
+      setReportError(
+        err instanceof Error ? err.message : "Failed to generate report. Try again.",
+      );
+      setStep("M3");
+    }
+  };
 
   // Tour steps
   const tourSteps: Step[] = [
@@ -152,9 +205,13 @@ export default function MapPage() {
             className="bg-transparent text-white placeholder-white/40 outline-none w-full text-sm"
           />
         </div>
-        <div className="bg-[#2a2a3e] p-3 rounded-2xl">
+        <button
+          onClick={() => navigate("/account")}
+          className="bg-[#2a2a3e] p-3 rounded-2xl active:scale-95 transition-transform"
+          aria-label="Account"
+        >
           <User size={18} className="text-white" />
-        </div>
+        </button>
       </div>
 
       {/* Map iframe - loads the map.html Thor made */}
@@ -280,31 +337,16 @@ export default function MapPage() {
             </div>
           </div>
 
+          {/* Error display */}
+          {reportError && (
+            <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-center">
+              <p className="text-red-300 text-sm">{reportError}</p>
+            </div>
+          )}
+
           {/* Generate report button */}
           <button
-            onClick={async () => {
-              if (!coords) return;
-              setStep("M4");
-              try {
-                const [res, outdoorCount, indoorCount] = await Promise.all([
-                  fetch(
-                    `/api/report-data?lat=${coords.lat}&lng=${coords.lng}&radius=${radius}`,
-                  ),
-                  getOutdoorCount(coords.lat, coords.lng, radius),
-                  getIndoorCount(coords.lat, coords.lng, radius),
-                ]);
-                const data = await res.json();
-                navigate("/results", {
-                  state: {
-                    report: data,
-                    outdoor: outdoorCount,
-                    indoor: indoorCount,
-                  },
-                });
-              } catch {
-                setStep("M3");
-              }
-            }}
+            onClick={handleGenerateReport}
             className="w-full bg-blue-500 hover:bg-blue-600 active:scale-95 transition-all text-white font-semibold py-4 rounded-full text-base generate-button"
           >
             Generate report ↗
@@ -328,90 +370,4 @@ export default function MapPage() {
       <Joyride steps={tourSteps} run={runTour} continuous />
     </div>
   );
-}
-
-async function outdoorVendorCall(
-  lat: number,
-  lng: number,
-  radius: number,
-  setOutdoor: React.Dispatch<React.SetStateAction<number>>,
-) {
-  const sources = ["community-gardens-and-food-trees", "food-vendors"];
-
-  const totals = await Promise.all(
-    sources.map(async (path) => {
-      const response = await fetch(
-        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
-      );
-      const data = await response.json();
-      return Number(data.total_count ?? 0);
-    }),
-  );
-
-  setOutdoor(totals.reduce((sum, count) => sum + count, 0));
-}
-
-async function indoorVendorCall(
-  lat: number,
-  lng: number,
-  radius: number,
-  setIndoor: React.Dispatch<React.SetStateAction<number>>,
-) {
-  const sources = [
-    "free-low-cost-food",
-    "food-related-businesses",
-    "restaurants",
-  ];
-
-  const totals = await Promise.all(
-    sources.map(async (path) => {
-      const response = await fetch(
-        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
-      );
-      const data = await response.json();
-      return Number(data.total_count ?? 0);
-    }),
-  );
-
-  setIndoor(totals.reduce((sum, count) => sum + count, 0));
-}
-
-async function getOutdoorCount(
-  lat: number,
-  lng: number,
-  radius: number,
-): Promise<number> {
-  const sources = ["community-gardens-and-food-trees", "food-vendors"];
-  const totals = await Promise.all(
-    sources.map(async (path) => {
-      const response = await fetch(
-        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
-      );
-      const data = await response.json();
-      return Number(data.total_count ?? 0);
-    }),
-  );
-  return totals.reduce((sum, count) => sum + count, 0);
-}
-
-async function getIndoorCount(
-  lat: number,
-  lng: number,
-  radius: number,
-): Promise<number> {
-  const sources = [
-    "free-low-cost-food",
-    "food-related-businesses",
-    "restaurants",
-  ];
-  const totals = await Promise.all(
-    sources.map(async (path) => {
-      const response = await fetch(
-        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
-      );
-      const data = await response.json();
-      return Number(data.total_count ?? 0);
-    }),
-  );
-  return totals.reduce((sum, count) => sum + count, 0);
 }

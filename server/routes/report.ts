@@ -7,12 +7,10 @@ import {
 import path from "path";
 import { getNeighbourhoodFromCoords } from "../vulnerability/neighbourhoodMatcher";
 import { getPopulationVulnerability } from "../vulnerability/populationVulnerability";
-import {
-  heatExposureScore,
-  floodExposureScore,
-  providerDiversityScore,
-  vulnerabilityScore,
-} from "../vulnerability/scores";
+import { getHeatExposureScore } from "../vulnerability/heatExposureScore";
+import { getFloodExposureScore } from "../vulnerability/floodExposureScore";
+import { providerDiversityScore } from "../vulnerability/providerDiversityScore";
+import { vulnerabilityScore } from "../vulnerability/finalScore";
 
 const router = Router();
 
@@ -64,6 +62,11 @@ async function fetchVendorCount(slug: string, lon: number, lat: number, radius: 
   return Number(data.total_count ?? 0);
 }
 
+// 0–100 → 0–5 star rating, clamped.
+function toStars(score: number): number {
+  return Math.max(0, Math.min(5, Math.round(score / 20)));
+}
+
 router.get(
   "/",
   async (req: Request, res: Response, next: NextFunction) => {
@@ -93,52 +96,55 @@ router.get(
         : null;
 
       // 3. Vendor counts within radius
-      const [outdoorCounts, indoorCounts] = await Promise.all([
-        Promise.all(OUTDOOR_SOURCES.map((s) => fetchVendorCount(s, lng, lat, radius))),
-        Promise.all(INDOOR_SOURCES.map((s) => fetchVendorCount(s, lng, lat, radius))),
-      ]);
-      const outdoorTotal = outdoorCounts.reduce((a, b) => a + b, 0);
-      const indoorTotal = indoorCounts.reduce((a, b) => a + b, 0);
-      const totalVendors = outdoorTotal + indoorTotal;
+      // Accept pre-computed counts from query params, or fetch from API
+      const outdoorParam = Number(req.query.outdoor);
+      const indoorParam = Number(req.query.indoor);
+      let outdoorTotal: number;
+      let indoorTotal: number;
 
-      // 4. Derived scores (0–100 scale)
+      if (Number.isFinite(outdoorParam) && Number.isFinite(indoorParam)) {
+        outdoorTotal = outdoorParam;
+        indoorTotal = indoorParam;
+      } else {
+        const [outdoorCounts, indoorCounts] = await Promise.all([
+          Promise.all(OUTDOOR_SOURCES.map((s) => fetchVendorCount(s, lng, lat, radius))),
+          Promise.all(INDOOR_SOURCES.map((s) => fetchVendorCount(s, lng, lat, radius))),
+        ]);
+        outdoorTotal = outdoorCounts.reduce((a, b) => a + b, 0);
+        indoorTotal = indoorCounts.reduce((a, b) => a + b, 0);
+      }
+
+      // 4. Heat + flood exposure from external APIs
+      const [heatResult, floodResult] = await Promise.all([
+        getHeatExposureScore(lat, lng, radius),
+        getFloodExposureScore(lat, lng),
+      ]);
+
+      // 5. Derived scores (0–100 scale)
       const areaKm2 = (Math.PI * radius * radius) / 1_000_000;
 
-      const heatScore = totalVendors > 0
-        ? Math.round(heatExposureScore(outdoorTotal, totalVendors) * 100)
-        : 0;
-
-      // We don't yet have a flood-zone count per area, so leave 0 until that
-      // dataset is wired up. The shape stays the same so the AI prompt and UI
-      // don't change once it lands.
-      const floodScore = 0;
-      void floodExposureScore;
-
-      const diversityScore = Math.round(
-        providerDiversityScore(outdoorTotal, indoorTotal) * 100,
+      const floodScore = floodResult.floodExposureScore;
+      const climateDisruptionScore = Math.round(
+        (heatResult.heatExposureScore + floodScore) / 2,
       );
 
+      const diversityScore = providerDiversityScore(outdoorTotal, indoorTotal);
       const populationScore = population?.populationVulnerabilityScore ?? 0;
 
-      const hazardScore = heatScore; // placeholder until flood lands
       const overallScore = Math.round(
         vulnerabilityScore(
-          hazardScore,
+          heatResult.heatExposureScore,
           populationScore,
           diversityScore,
           floodScore,
         ),
       );
 
-      // 0–100 → 0–5 star rating, clamped.
-      const toStars = (score: number) =>
-        Math.max(0, Math.min(5, Math.round(score / 20)));
-
       return res.json({
+        neighbourhood,
         coords: { lat, lng },
         radiusM: radius,
         areaKm2: Math.round(areaKm2 * 100) / 100,
-        neighbourhood,
         population,
         vendors: {
           outdoor: outdoorTotal,
@@ -146,19 +152,23 @@ router.get(
           ratio: indoorTotal > 0 ? Math.round((outdoorTotal / indoorTotal) * 100) / 100 : null,
         },
         scores: {
-          heat: heatScore,
+          heatExposureScore: heatResult.heatExposureScore,
+          floodExposureScore: floodScore,
+          climateDisruptionScore,
           flood: floodScore,
           population: populationScore,
           diversity: diversityScore,
           overall: overallScore,
         },
         stars: {
-          heat: toStars(heatScore),
+          heat: toStars(heatResult.heatExposureScore),
           flood: toStars(floodScore),
           population: toStars(populationScore),
           diversity: toStars(diversityScore),
           overall: toStars(overallScore),
         },
+        inFloodZone: floodResult.inFloodZone,
+        floodZoneName: floodResult.floodZoneName,
       });
     } catch (err) {
       next(err);

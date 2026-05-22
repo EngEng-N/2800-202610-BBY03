@@ -242,7 +242,12 @@ console.log("Registered GET /api/flood-exposure");
 
 // ─── Serve frontend static files ─────────────────────────────────────────────
 const distPath = nodePath.join(__dirname, "..", "dist");
+const publicPath = nodePath.join(__dirname, "..", "public");
 app.use(express.static(distPath));
+app.use("/html", express.static(nodePath.join(publicPath, "html")));
+app.use("/css", express.static(nodePath.join(publicPath, "css")));
+app.use("/js", express.static(nodePath.join(publicPath, "js")));
+app.use("/assets", express.static(nodePath.join(publicPath, "assets")));
 
 // Catch-all: serve index.html for client-side routing
 app.get("/{*path}", (_req: Request, res: Response) => {

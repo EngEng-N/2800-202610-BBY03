@@ -1,43 +1,47 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import "../components/ResultPanel.css";
+import "../../css/ResultPanel.css";
 
 interface ReportData {
-  neighbourhood: string;
+  neighbourhood: string | null;
   coords: { lat: number; lng: number };
   radiusM: number;
   areaKm2: number;
   population: {
+    neighbourhood: string;
     seniorsPercent: number;
     lowIncomePercent: number;
     renterPercent: number;
+    seniorsScore: number;
+    lowIncomeScore: number;
+    renterScore: number;
     populationVulnerabilityScore: number;
-  };
+  } | null;
   vendors: {
     outdoor: number;
     indoor: number;
+    ratio: number | null;
   };
   scores: {
     heatExposureScore: number;
     floodExposureScore: number;
     climateDisruptionScore: number;
-    populationVulnerabilityScore: number;
-    providerDiversityScore?: number;
-    overallVulnerabilityScore?: number;
+    heat: number;
+    flood: number;
+    population: number;
+    diversity: number;
+    overall: number;
   };
   stars: {
     heat: number;
     flood: number;
-    seniors: number;
-    income: number;
-    renters: number;
+    population: number;
     diversity: number;
     overall: number;
   };
   inFloodZone: boolean;
   floodZoneName: string | null;
-  createdAt?: string;
 }
 
 interface SavedLocation {
@@ -53,110 +57,19 @@ interface SavedLocation {
   report: ReportData | null;
 }
 
-function renderStars(stars: number): string {
-  const s = Math.max(0, Math.min(5, stars));
-  return "★".repeat(s) + "☆".repeat(5 - s);
+function renderStars(count: number): string {
+  const clamped = Math.max(0, Math.min(5, count));
+  return "★".repeat(clamped) + "☆".repeat(5 - clamped);
 }
 
-function formatPercent(value: number): string {
-  return `${value.toFixed(1)}%`;
+function fmtPct(n: number | null | undefined): string {
+  return typeof n === "number" && Number.isFinite(n) ? `${n.toFixed(1)}%` : "—";
 }
 
-function formatScore(value?: number): string {
-  return typeof value === "number" ? `${Math.round(value)}/100` : "N/A";
-}
-
-function buildDownloadReport(
-  report: ReportData,
-  areaName: string,
-  outdoor: number,
-  indoor: number,
-) {
-  const trimmedName = areaName.trim();
-  const displayAreaName = trimmedName || report.neighbourhood;
-  const ratio = indoor > 0 ? outdoor / indoor : null;
-
-  const outdoorIndoorRatio =
-    indoor === 0
-      ? "N/A"
-      : outdoor === 0
-        ? "N/A"
-        : ratio !== null && ratio < 0.1
-          ? ratio.toFixed(3)
-          : ratio !== null
-            ? ratio.toFixed(1)
-            : "N/A";
-
-  const ratioNote =
-    indoor === 0
-      ? outdoor > 0
-        ? "Only outdoor vendors were found in this area."
-        : "No indoor or outdoor vendors were found in this area."
-      : outdoor === 0
-        ? "Only indoor vendors were found in this area."
-        : "Both indoor and outdoor vendors were found in this area.";
-
-  return {
-    reportTitle: `${displayAreaName} Food Vulnerability Report`,
-    generatedAt: new Date().toISOString(),
-
-    area: {
-      selectedAreaName: displayAreaName,
-      neighbourhood: report.neighbourhood,
-      coordinates: {
-        latitude: report.coords.lat,
-        longitude: report.coords.lng,
-      },
-      analysisRadiusMeters: report.radiusM,
-      analysisAreaSquareKm: report.areaKm2,
-    },
-
-    climateDisturbance: {
-      heatwave: {
-        score: formatScore(report.scores.heatExposureScore),
-        rating: renderStars(report.stars.heat),
-      },
-      flood: {
-        inFloodZone: report.inFloodZone ? "Yes" : "No",
-        floodZoneName: report.floodZoneName ?? "None",
-        score: formatScore(report.scores.floodExposureScore),
-        rating: renderStars(report.stars.flood),
-      },
-      climateDisruptionScore: formatScore(report.scores.climateDisruptionScore),
-    },
-
-    population: {
-      seniors: {
-        percentage: formatPercent(report.population.seniorsPercent),
-        rating: renderStars(report.stars.seniors),
-      },
-      lowIncome: {
-        percentage: formatPercent(report.population.lowIncomePercent),
-        rating: renderStars(report.stars.income),
-      },
-      renters: {
-        percentage: formatPercent(report.population.renterPercent),
-        rating: renderStars(report.stars.renters),
-      },
-      populationVulnerabilityScore: formatScore(
-        report.population.populationVulnerabilityScore,
-      ),
-    },
-
-    foodDiversity: {
-      outdoorVendors: outdoor,
-      indoorVendors: indoor,
-      outdoorIndoorRatio,
-      ratioNote,
-      providerDiversityScore: formatScore(report.scores.providerDiversityScore),
-      diversityRating: renderStars(report.stars.diversity),
-    },
-
-    overallVulnerability: {
-      overallScore: formatScore(report.scores.overallVulnerabilityScore),
-      overallRating: renderStars(report.stars.overall),
-    },
-  };
+function fmtScore(n: number | null | undefined): string {
+  return typeof n === "number" && Number.isFinite(n)
+    ? `${Math.round(n)} / 100`
+    : "—";
 }
 
 export default function SavedLocationDetailPage() {
@@ -226,6 +139,7 @@ export default function SavedLocationDetailPage() {
         const data = await res.json();
         if (!cancelled) setSummary(data.summary ?? null);
       } catch {
+        // silent — summary is optional
       } finally {
         if (!cancelled) setSummaryLoading(false);
       }
@@ -235,27 +149,50 @@ export default function SavedLocationDetailPage() {
     };
   }, [item, summary, summaryLoading]);
 
+  const buildDownloadReport = (report: ReportData) => ({
+    area: {
+      neighbourhood: report.neighbourhood,
+      coordinates: report.coords,
+      radiusMeters: report.radiusM,
+      areaKm2: report.areaKm2,
+    },
+    climate: {
+      heatExposureScore: report.scores.heatExposureScore,
+      floodExposureScore: report.scores.floodExposureScore,
+      climateDisruptionScore: report.scores.climateDisruptionScore,
+      inFloodZone: report.inFloodZone,
+      floodZoneName: report.floodZoneName,
+    },
+    population: report.population
+      ? {
+          seniorsPercent: report.population.seniorsPercent,
+          lowIncomePercent: report.population.lowIncomePercent,
+          renterPercent: report.population.renterPercent,
+          populationVulnerabilityScore: report.population.populationVulnerabilityScore,
+        }
+      : null,
+    diversity: {
+      outdoorVendors: report.vendors.outdoor,
+      indoorVendors: report.vendors.indoor,
+      ratio: report.vendors.ratio,
+      diversityScore: report.scores.diversity,
+    },
+    overall: {
+      score: report.scores.overall,
+      stars: report.stars.overall,
+    },
+  });
+
   const handleDownload = () => {
     if (!item?.report) return;
-
-    const filename = item.name.replace(/\s+/g, "-").toLowerCase();
-    const downloadReport = buildDownloadReport(
-      item.report,
-      item.name,
-      item.outdoor ?? 0,
-      item.indoor ?? 0,
-    );
-
-    const blob = new Blob([JSON.stringify(downloadReport, null, 2)], {
+    const blob = new Blob([JSON.stringify(buildDownloadReport(item.report), null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${filename}-report.json`;
-    document.body.appendChild(a);
+    a.download = `${item.name}-report.json`;
     a.click();
-    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
@@ -283,29 +220,19 @@ export default function SavedLocationDetailPage() {
   }
 
   const report = item.report;
-  const outdoor = item.outdoor ?? 0;
-  const indoor = item.indoor ?? 0;
-  const ratio = indoor > 0 ? outdoor / indoor : null;
-
-  const outdoorIndoorRatio =
-    indoor === 0
-      ? "N/A"
-      : outdoor === 0
-        ? "N/A"
-        : ratio !== null && ratio < 0.1
-          ? ratio.toFixed(3)
-          : ratio !== null
-            ? ratio.toFixed(1)
-            : "N/A";
-
+  const outdoor = report.vendors?.outdoor ?? item.outdoor ?? 0;
+  const indoor = report.vendors?.indoor ?? item.indoor ?? 0;
+  const ratio = report.vendors?.ratio ?? null;
   const ratioNote =
-    indoor === 0
+    ratio === null
       ? outdoor > 0
-        ? "Only outdoor vendors were found in this area."
-        : "No indoor or outdoor vendors were found in this area."
-      : outdoor === 0
-        ? "Only indoor vendors were found in this area."
-        : "";
+        ? "No indoor vendors — outdoor only"
+        : "No vendors found"
+      : ratio < 0.5
+        ? "Heavily indoor-dependent"
+        : ratio > 2
+          ? "Mostly outdoor sources"
+          : "Balanced mix";
 
   return (
     <div className="min-h-screen bg-[#1a1a2e] text-white">
@@ -343,20 +270,22 @@ export default function SavedLocationDetailPage() {
         <div className="bg-[#2a2a3e] rounded-2xl p-4 grid grid-cols-2 gap-3 text-sm">
           <div>
             <p className="text-white/40 text-xs">Neighbourhood</p>
-            <p className="font-medium">{report.neighbourhood}</p>
+            <p className="font-medium">{report.neighbourhood ?? "—"}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Coordinates</p>
             <p className="font-medium">
-              {typeof item.lat === "number" && typeof item.lng === "number"
-                ? `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`
-                : "—"}
+              {report.coords
+                ? `${report.coords.lat.toFixed(4)}, ${report.coords.lng.toFixed(4)}`
+                : typeof item.lat === "number" && typeof item.lng === "number"
+                  ? `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`
+                  : "—"}
             </p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Radius</p>
             <p className="font-medium">
-              {item.radius ? `${item.radius} m` : "—"}
+              {report.radiusM ? `${report.radiusM} m` : item.radius ? `${item.radius} m` : "—"}
             </p>
           </div>
           <div>
@@ -369,21 +298,15 @@ export default function SavedLocationDetailPage() {
           </div>
           <div>
             <p className="text-white/40 text-xs">Seniors</p>
-            <p className="font-medium">
-              {formatPercent(report.population.seniorsPercent)}
-            </p>
+            <p className="font-medium">{fmtPct(report.population?.seniorsPercent)}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Low income</p>
-            <p className="font-medium">
-              {formatPercent(report.population.lowIncomePercent)}
-            </p>
+            <p className="font-medium">{fmtPct(report.population?.lowIncomePercent)}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Renters</p>
-            <p className="font-medium">
-              {formatPercent(report.population.renterPercent)}
-            </p>
+            <p className="font-medium">{fmtPct(report.population?.renterPercent)}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Outdoor / Indoor vendors</p>
@@ -393,26 +316,22 @@ export default function SavedLocationDetailPage() {
           </div>
           <div>
             <p className="text-white/40 text-xs">Heat score</p>
-            <p className="font-medium">
-              {formatScore(report.scores.heatExposureScore)}
-            </p>
+            <p className="font-medium">{fmtScore(report.scores?.heatExposureScore)}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Flood score</p>
-            <p className="font-medium">
-              {formatScore(report.scores.floodExposureScore)}
-            </p>
+            <p className="font-medium">{fmtScore(report.scores?.floodExposureScore)}</p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Climate disruption</p>
             <p className="font-medium">
-              {formatScore(report.scores.climateDisruptionScore)}
+              {fmtScore(report.scores?.climateDisruptionScore)}
             </p>
           </div>
           <div>
             <p className="text-white/40 text-xs">Population vulnerability</p>
             <p className="font-medium">
-              {formatScore(report.population.populationVulnerabilityScore)}
+              {fmtScore(report.population?.populationVulnerabilityScore)}
             </p>
           </div>
         </div>
@@ -420,22 +339,21 @@ export default function SavedLocationDetailPage() {
         <div className="result-panel-container">
           <div className="result-panel-header">
             <span className="report-area-label">
-              Report Area: {report.neighbourhood}
+              Report Area: {report.neighbourhood ?? "Unknown"}
             </span>
           </div>
           <hr />
-
           <div className="climate-disurbance">
             <span className="climate-disturbance-label label">
               Climate Disturbance
             </span>
             <div className="heatwave-container sub-container">
               <p>Heatwave</p>
-              <span>{renderStars(report.stars.heat)}</span>
+              <span>{renderStars(report.stars?.heat ?? 0)}</span>
             </div>
             <div className="flood-container sub-container">
               <p>Flood</p>
-              <span>{renderStars(report.stars.flood)}</span>
+              <span>{renderStars(report.stars?.flood ?? 0)}</span>
             </div>
           </div>
 
@@ -443,15 +361,27 @@ export default function SavedLocationDetailPage() {
             <span className="population-label label">Population</span>
             <div className="senior-container sub-container">
               <p>Seniors</p>
-              <span>{renderStars(report.stars.seniors)}</span>
+              <span>{renderStars(report.stars?.population ?? 0)}</span>
             </div>
             <div className="income-container sub-container">
               <p>Income</p>
-              <span>{renderStars(report.stars.income)}</span>
+              <span>
+                {renderStars(
+                  report.population
+                    ? Math.round(report.population.lowIncomeScore / 20)
+                    : 0,
+                )}
+              </span>
             </div>
             <div className="handicap-container sub-container">
               <p>Renters</p>
-              <span>{renderStars(report.stars.renters)}</span>
+              <span>
+                {renderStars(
+                  report.population
+                    ? Math.round(report.population.renterScore / 20)
+                    : 0,
+                )}
+              </span>
             </div>
           </div>
 
@@ -459,12 +389,13 @@ export default function SavedLocationDetailPage() {
             <span className="food-diversity-label label">Food Diversity</span>
             <div className="ratio-container sub-container">
               <p>Outdoor - Indoor Ratio</p>
-              <span>{outdoorIndoorRatio}</span>
+              <span>{renderStars(report.stars?.diversity ?? 0)}</span>
             </div>
-            {ratioNote && <p className="ratio-note">{ratioNote}</p>}
             <div className="ratio-container sub-container">
-              <p>Diversity</p>
-              <span>{renderStars(report.stars.diversity)}</span>
+              <p style={{ fontSize: "12px", color: "#888" }}>{ratioNote}</p>
+              <span style={{ fontSize: "12px" }}>
+                {outdoor} / {indoor}
+              </span>
             </div>
           </div>
 
@@ -473,7 +404,7 @@ export default function SavedLocationDetailPage() {
               <p className="overall-label label">
                 Overall Vulnerability Rating
               </p>
-              <span>{renderStars(report.stars.overall)}</span>
+              <span>{renderStars(report.stars?.overall ?? 0)}</span>
             </div>
           </div>
 

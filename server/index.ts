@@ -3,6 +3,7 @@ import { getPopulationVulnerability } from "./vulnerability/populationVulnerabil
 import { getNeighbourhoodFromCoords } from "./vulnerability/neighbourhoodMatcher";
 import { getHeatExposureScore } from "./vulnerability/heatExposureScore";
 import { getFloodExposureScore } from "./vulnerability/floodExposureScore";
+import "dotenv/config";
 import express, {
   type NextFunction,
   type Request,
@@ -10,6 +11,7 @@ import express, {
 } from "express";
 import session from "express-session";
 import MongoStore from "connect-mongo";
+import rateLimit from "express-rate-limit";
 
 import datasetRouter from "./routes/datasets";
 import reportRouter from "./routes/report";
@@ -38,15 +40,27 @@ app.use(
       dbName: getSessionDbName(),
       collectionName: "sessions",
       crypto: {
-        secret: process.env.MONGODB_SESSION_SECRET ?? "dev-crypto-change-me",
+        secret:
+          process.env.MONGODB_SESSION_SECRET ?? "dev-crypto-change-me",
       },
     }),
     cookie: {
       httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
       maxAge: 1000 * 60 * 60 * 24 * 7,
     },
   }),
 );
+
+// ─── Rate limiting on auth routes ───────────────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
 
 // ─── Open Vancouver API proxy routes ─────────────────────────────────────────
 const openVancouver: { path: string; url: string }[] = routes.openVancouver;
@@ -67,7 +81,7 @@ for (const { path, url } of openVancouver) {
   console.log(`Registered GET ${path}`);
 }
 
-app.use("/api/auth", authRouter);
+app.use("/api/auth", authLimiter, authRouter);
 app.use("/api/saved-locations", savedLocationsRouter);
 app.use("/api/datasets", datasetRouter);
 app.use("/api/report-data", reportRouter);
@@ -183,88 +197,6 @@ app.get("/api/neighbourhood", (req: Request, res: Response) => {
 });
 console.log("Registered GET /api/neighbourhood");
 
-// ─── Report data route ────────────────────────────────────────────────────────
-// app.get("/api/report-data", async (req: Request, res: Response) => {
-//   const lat = parseFloat(req.query.lat as string);
-//   const lng = parseFloat(req.query.lng as string);
-//   const radius = parseInt(req.query.radius as string) || 500;
-
-//   if (isNaN(lat) || isNaN(lng)) {
-//     return res.status(400).json({ error: "Missing lat/lng" });
-//   }
-
-//   const boundaryPath = nodePath.join(
-//     __dirname,
-//     "datasets",
-//     "local-area-boundary.json",
-//   );
-//   const neighbourhood = getNeighbourhoodFromCoords(lat, lng, boundaryPath);
-//   if (!neighbourhood) {
-//     return res
-//       .status(404)
-//       .json({ error: "Location is outside Vancouver neighbourhoods" });
-//   }
-
-//   const csvPath = nodePath.join(
-//     __dirname,
-//     "datasets",
-//     "CensusLocalAreaProfiles2016.csv",
-//   );
-//   const populationResult = getPopulationVulnerability(neighbourhood, csvPath);
-//   if (!populationResult) {
-//     return res
-//       .status(500)
-//       .json({ error: `Could not find census data for ${neighbourhood}` });
-//   }
-
-//   const [heatResult, floodResult] = await Promise.all([
-//     getHeatExposureScore(lat, lng, radius),
-//     getFloodExposureScore(lat, lng),
-//   ]);
-
-//   const climateDisruptionScore = Math.round(
-//     (heatResult.heatExposureScore + floodResult.floodExposureScore) / 2,
-//   );
-
-//   return res.json({
-//     neighbourhood: populationResult.neighbourhood,
-//     coords: { lat, lng },
-//     radiusM: radius,
-//     areaKm2:
-//       Math.round(((Math.PI * Math.pow(radius, 2)) / 1_000_000) * 100) / 100,
-//     population: {
-//       seniorsPercent: populationResult.seniorsPercent,
-//       lowIncomePercent: populationResult.lowIncomePercent,
-//       renterPercent: populationResult.renterPercent,
-//       populationVulnerabilityScore:
-//         populationResult.populationVulnerabilityScore,
-//     },
-//     vendors: {
-//       outdoor: 0, // TB fills this in from dataset router
-//       indoor: 0,
-//     },
-//     scores: {
-//       heatExposureScore: heatResult.heatExposureScore,
-//       floodExposureScore: floodResult.floodExposureScore,
-//       climateDisruptionScore,
-//       populationVulnerabilityScore:
-//         populationResult.populationVulnerabilityScore,
-//     },
-//     stars: {
-//       heat: Math.round((heatResult.heatExposureScore / 100) * 5),
-//       flood: Math.round((floodResult.floodExposureScore / 100) * 5),
-//       seniors: Math.round((populationResult.seniorsScore / 100) * 5),
-//       income: Math.round((populationResult.lowIncomeScore / 100) * 5),
-//       renters: Math.round((populationResult.renterScore / 100) * 5),
-//       diversity: 0,
-//       overall: 0,
-//     },
-//     inFloodZone: floodResult.inFloodZone,
-//     floodZoneName: floodResult.floodZoneName,
-//   });
-// });
-// console.log("Registered GET /api/report-data");
-
 // ─── Heat exposure route ──────────────────────────────────────────────────────
 app.get("/api/heat-exposure", async (req: Request, res: Response) => {
   const lat = parseFloat(req.query.lat as string);
@@ -308,9 +240,13 @@ app.get("/api/flood-exposure", async (req: Request, res: Response) => {
 });
 console.log("Registered GET /api/flood-exposure");
 
-// ─── 404 + error handlers ─────────────────────────────────────────────────────
-app.use((_req: Request, res: Response) => {
-  res.status(404).json({ error: "Not found" });
+// ─── Serve frontend static files ─────────────────────────────────────────────
+const distPath = nodePath.join(__dirname, "..", "dist");
+app.use(express.static(distPath));
+
+// Catch-all: serve index.html for client-side routing
+app.get("/{*path}", (_req: Request, res: Response) => {
+  res.sendFile(nodePath.join(distPath, "index.html"));
 });
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

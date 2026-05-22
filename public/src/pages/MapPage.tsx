@@ -4,9 +4,41 @@ import { Joyride } from "react-joyride";
 import type { Step } from "react-joyride";
 import { useNavigate } from "react-router-dom";
 
-const url = "http://localhost:3000";
+{
+  /*
+Check wireflow for reference: https://www.figma.com/design/fu3jVRM7yiI5Mw7bEADW5L/2800-BBY-03?node-id=0-1&t=5cqgCQAvjjqLinWP-0
+M1 - No UI, waiting for location to be Selected
+M2 - Change location or verify usage of this area
+M3 - Main UI
+*/
+}
 
 type AppStep = "M1" | "M2" | "M3" | "M4";
+
+const OUTDOOR_SOURCES = ["community-gardens-and-food-trees", "food-vendors"];
+const INDOOR_SOURCES = ["free-low-cost-food", "food-related-businesses", "restaurants"];
+
+async function fetchVendorCount(
+  sources: string[],
+  lat: number,
+  lng: number,
+  radius: number,
+): Promise<number> {
+  const totals = await Promise.all(
+    sources.map(async (path) => {
+      try {
+        const response = await fetch(
+          `/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
+        );
+        const data = await response.json();
+        return Number(data.total_count ?? 0);
+      } catch {
+        return 0;
+      }
+    }),
+  );
+  return totals.reduce((sum, count) => sum + count, 0);
+}
 
 export default function MapPage() {
   const navigate = useNavigate();
@@ -16,10 +48,12 @@ export default function MapPage() {
     "Tap the map to select a location",
   );
   const [runTour, setRunTour] = useState(false);
-  const [reportError, setReportError] = useState("");
+  const [reportError, setReportError] = useState<string | null>(null);
 
+  // Reference to the iframe so we can talk to the map inside it
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // Updates MapPage slider + tells the map inside the iframe to update its circle
   const updateRadius = (r: number) => {
     setRadius(r);
     iframeRef.current?.contentWindow?.postMessage(
@@ -28,6 +62,7 @@ export default function MapPage() {
     );
   };
 
+  // Listen for location selected event from the map iframe
   const [outdoor, setOutdoor] = useState(0);
   const [indoor, setIndoor] = useState(0);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
@@ -44,20 +79,15 @@ export default function MapPage() {
       if (e.data?.type === "LOCATION_SELECTED") {
         const selectedLat = e.data.lat;
         const selectedLng = e.data.lng;
-
         setCoords({ lat: selectedLat, lng: selectedLng });
         setOutdoor(0);
         setIndoor(0);
-        setReportError("");
+        setReportError(null);
 
-        Promise.all([
-          getOutdoorCount(selectedLat, selectedLng, radiusRef.current),
-          getIndoorCount(selectedLat, selectedLng, radiusRef.current),
-        ]).then(([o, i]) => {
-          setOutdoor(o);
-          setIndoor(i);
-        });
+        fetchVendorCount(OUTDOOR_SOURCES, selectedLat, selectedLng, radiusRef.current).then(setOutdoor);
+        fetchVendorCount(INDOOR_SOURCES, selectedLat, selectedLng, radiusRef.current).then(setIndoor);
 
+        // Reverse geocode coordinates to a readable address
         try {
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${selectedLat}&lon=${selectedLng}&format=json`,
@@ -74,7 +104,6 @@ export default function MapPage() {
         setStep("M2");
       }
     };
-
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, []);
@@ -84,17 +113,50 @@ export default function MapPage() {
 
     setOutdoor(0);
     setIndoor(0);
-    setReportError("");
 
-    Promise.all([
-      getOutdoorCount(coords.lat, coords.lng, radius),
-      getIndoorCount(coords.lat, coords.lng, radius),
-    ]).then(([o, i]) => {
-      setOutdoor(o);
-      setIndoor(i);
-    });
+    fetchVendorCount(OUTDOOR_SOURCES, coords.lat, coords.lng, radius).then(setOutdoor);
+    fetchVendorCount(INDOOR_SOURCES, coords.lat, coords.lng, radius).then(setIndoor);
   }, [coords, radius]);
 
+  const handleGenerateReport = async () => {
+    if (!coords) return;
+    setStep("M4");
+    setReportError(null);
+    try {
+      const [outdoorCount, indoorCount] = await Promise.all([
+        fetchVendorCount(OUTDOOR_SOURCES, coords.lat, coords.lng, radius),
+        fetchVendorCount(INDOOR_SOURCES, coords.lat, coords.lng, radius),
+      ]);
+
+      const res = await fetch(
+        `/api/report-data?lat=${coords.lat}&lng=${coords.lng}&radius=${radius}&outdoor=${outdoorCount}&indoor=${indoorCount}`,
+      );
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error (${res.status})`);
+      }
+
+      const data = await res.json();
+      navigate("/results", {
+        state: {
+          report: data,
+          outdoor: outdoorCount,
+          indoor: indoorCount,
+          lat: coords.lat,
+          lng: coords.lng,
+          radius,
+        },
+      });
+    } catch (err) {
+      setReportError(
+        err instanceof Error ? err.message : "Failed to generate report. Try again.",
+      );
+      setStep("M3");
+    }
+  };
+
+  // Tour steps
   const tourSteps: Step[] = [
     {
       target: ".map-iframe",
@@ -131,48 +193,9 @@ export default function MapPage() {
     },
   ];
 
-  async function handleGenerateReport() {
-    if (!coords) return;
-
-    setReportError("");
-    setStep("M4");
-
-    try {
-      const [outdoorCount, indoorCount] = await Promise.all([
-        getOutdoorCount(coords.lat, coords.lng, radius),
-        getIndoorCount(coords.lat, coords.lng, radius),
-      ]);
-
-      const res = await fetch(
-        `/api/report-data?lat=${coords.lat}&lng=${coords.lng}&radius=${radius}&outdoor=${outdoorCount}&indoor=${indoorCount}`,
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to generate report");
-      }
-
-      navigate("/results", {
-        state: {
-          report: data,
-          outdoor: outdoorCount,
-          indoor: indoorCount,
-          lat: coords.lat,
-          lng: coords.lng,
-          radius,
-        },
-      });
-    } catch (error) {
-      setReportError(
-        "Could not generate report. Please try another location or try again.",
-      );
-      setStep("M3");
-    }
-  }
-
   return (
     <div className="relative h-screen w-full flex flex-col bg-[#1a1a2e] overflow-hidden">
+      {/* Search bar - Non functional atm */}
       <div className="relative z-10 flex items-center gap-3 px-4 pt-10 pb-4">
         <div className="flex-1 flex items-center gap-2 bg-[#2a2a3e] rounded-2xl px-4 py-3">
           <Search size={18} className="text-white/50" />
@@ -191,6 +214,7 @@ export default function MapPage() {
         </button>
       </div>
 
+      {/* Map iframe - loads the map.html Thor made */}
       <div
         className="mx-4 rounded-3xl overflow-hidden transition-all duration-300"
         style={{
@@ -212,6 +236,7 @@ export default function MapPage() {
         />
       </div>
 
+      {/* Location bar for M2 */}
       {step !== "M3" && (
         <div className="px-4 py-3">
           <div className="bg-[#2a2a3e] rounded-2xl px-4 py-3 flex items-center gap-2 location-display">
@@ -221,6 +246,7 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* M2 - Analyze or change location popup */}
       {step === "M2" && (
         <div className="absolute inset-0 bg-black/50 z-20 flex items-end px-8 pb-24">
           <div className="bg-[#2a2a3e] rounded-3xl p-6 w-full">
@@ -248,15 +274,19 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* M3 - Radius controls and stats */}
       {step === "M3" && (
         <div className="bg-[#1a1a2e] rounded-t-3xl px-6 pt-4 pb-8 overflow-y-auto max-h-[55vh]">
+          {/* Drag handle */}
           <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-4" />
 
+          {/* Selected location */}
           <div className="flex items-center gap-2 text-white text-sm mb-4">
             <MapPin size={14} className="text-blue-400" />
             <span>{location}</span>
           </div>
 
+          {/* Radius slider - sends value to the map iframe */}
           <div className="mb-3 radius-slider">
             <div className="flex justify-between text-xs text-white/50 mb-2">
               <span>Radius</span>
@@ -272,6 +302,7 @@ export default function MapPage() {
             />
           </div>
 
+          {/* Radius preset buttons (250m, 500m, 1000m, 5000m) */}
           <div className="flex gap-2 mb-6 radius-buttons">
             {[250, 500, 1000, 5000].map((r) => (
               <button
@@ -288,6 +319,7 @@ export default function MapPage() {
             ))}
           </div>
 
+          {/* Stats - area scales with radius, vendors are placeholders until backend is connected */}
           <div className="flex gap-4 mb-6 stats-section">
             <div className="flex-1 bg-[#2a2a3e] rounded-2xl p-4">
               <p className="text-white text-lg font-bold">
@@ -305,12 +337,14 @@ export default function MapPage() {
             </div>
           </div>
 
+          {/* Error display */}
           {reportError && (
-            <div className="mb-4 rounded-2xl bg-red-500/15 border border-red-400/30 px-4 py-3">
-              <p className="text-sm text-red-300">{reportError}</p>
+            <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-center">
+              <p className="text-red-300 text-sm">{reportError}</p>
             </div>
           )}
 
+          {/* Generate report button */}
           <button
             onClick={handleGenerateReport}
             className="w-full bg-blue-500 hover:bg-blue-600 active:scale-95 transition-all text-white font-semibold py-4 rounded-full text-base generate-button"
@@ -320,6 +354,7 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* M4 - Loading Overlay for generating report */}
       {step === "M4" && (
         <div className="absolute inset-0 bg-black/70 z-20 flex flex-col items-center justify-center gap-4">
           <div className="w-10 h-10 border-4 border-white/20 border-t-blue-400 rounded-full animate-spin" />
@@ -334,50 +369,5 @@ export default function MapPage() {
 
       <Joyride steps={tourSteps} run={runTour} continuous />
     </div>
-  );
-}
-
-async function fetchVendorCount(
-  sources: string[],
-  lat: number,
-  lng: number,
-  radius: number,
-): Promise<number> {
-  const totals = await Promise.all(
-    sources.map(async (path) => {
-      const response = await fetch(
-        `${url}/api/datasets/${path}?lat=${lat}&lon=${lng}&radius=${radius}m`,
-      );
-      const data = await response.json();
-      return Number(data.total_count ?? 0);
-    }),
-  );
-
-  return totals.reduce((sum, count) => sum + count, 0);
-}
-
-async function getOutdoorCount(
-  lat: number,
-  lng: number,
-  radius: number,
-): Promise<number> {
-  return fetchVendorCount(
-    ["community-gardens-and-food-trees", "food-vendors"],
-    lat,
-    lng,
-    radius,
-  );
-}
-
-async function getIndoorCount(
-  lat: number,
-  lng: number,
-  radius: number,
-): Promise<number> {
-  return fetchVendorCount(
-    ["free-low-cost-food", "food-related-businesses", "restaurants"],
-    lat,
-    lng,
-    radius,
   );
 }

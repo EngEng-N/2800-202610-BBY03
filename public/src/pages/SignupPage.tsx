@@ -59,7 +59,7 @@ export default function SignupPage() {
     return (
         <div className="relative min-h-screen w-full flex flex-col items-center justify-center px-6 py-10 overflow-hidden">
             <img
-                src="/bg.jpg"
+                src="/assets/bg.jpg"
                 alt="background"
                 className="absolute top-0 left-0 w-full h-full object-cover z-0"
             />

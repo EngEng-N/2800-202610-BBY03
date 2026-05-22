@@ -97,7 +97,6 @@ export default function ResultPanel() {
 
       const res = await fetch("/api/saved-locations", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
@@ -110,10 +109,6 @@ export default function ResultPanel() {
           summary,
         }),
       });
-      if (res.status === 401) {
-        navigate("/login");
-        return;
-      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setSaveError(data.error ?? "Could not save.");

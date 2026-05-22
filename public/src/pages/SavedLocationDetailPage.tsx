@@ -85,13 +85,7 @@ export default function SavedLocationDetailPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/saved-locations", {
-          credentials: "include",
-        });
-        if (res.status === 401) {
-          navigate("/login");
-          return;
-        }
+        const res = await fetch("/api/saved-locations");
         if (!res.ok) {
           setError("Could not load saved location.");
           return;
@@ -112,7 +106,7 @@ export default function SavedLocationDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, navigate]);
+  }, [id]);
 
   useEffect(() => {
     if (!item?.report || summary || summaryLoading) return;

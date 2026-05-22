@@ -35,11 +35,7 @@ export default function SavedLocationsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/saved-locations", { credentials: "include" });
-        if (res.status === 401) {
-          navigate("/login");
-          return;
-        }
+        const res = await fetch("/api/saved-locations");
         if (!res.ok) {
           setError("Could not load saved locations.");
           return;
@@ -55,14 +51,13 @@ export default function SavedLocationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, []);
 
   async function handleDelete(id: string) {
     setDeletingId(id);
     try {
       const res = await fetch(`/api/saved-locations/${id}`, {
         method: "DELETE",
-        credentials: "include",
       });
       if (!res.ok) {
         setError("Could not delete.");

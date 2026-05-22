@@ -9,11 +9,8 @@ import { getNeighbourhoodFromCoords } from "../vulnerability/neighbourhoodMatche
 import { getPopulationVulnerability } from "../vulnerability/populationVulnerability";
 import { getHeatExposureScore } from "../vulnerability/heatExposureScore";
 import { getFloodExposureScore } from "../vulnerability/floodExposureScore";
-import {
-  heatExposureScore,
-  providerDiversityScore,
-  vulnerabilityScore,
-} from "../vulnerability/scores";
+import { providerDiversityScore } from "../vulnerability/providerDiversityScore";
+import { vulnerabilityScore } from "../vulnerability/finalScore";
 
 const router = Router();
 
@@ -117,8 +114,6 @@ router.get(
         indoorTotal = indoorCounts.reduce((a, b) => a + b, 0);
       }
 
-      const totalVendors = outdoorTotal + indoorTotal;
-
       // 4. Heat + flood exposure from external APIs
       const [heatResult, floodResult] = await Promise.all([
         getHeatExposureScore(lat, lng, radius),
@@ -127,10 +122,6 @@ router.get(
 
       // 5. Derived scores (0–100 scale)
       const areaKm2 = (Math.PI * radius * radius) / 1_000_000;
-
-      const heatScore = totalVendors > 0
-        ? heatExposureScore(outdoorTotal, totalVendors)
-        : 0;
 
       const floodScore = floodResult.floodExposureScore;
       const climateDisruptionScore = Math.round(
@@ -164,7 +155,6 @@ router.get(
           heatExposureScore: heatResult.heatExposureScore,
           floodExposureScore: floodScore,
           climateDisruptionScore,
-          heat: heatScore,
           flood: floodScore,
           population: populationScore,
           diversity: diversityScore,

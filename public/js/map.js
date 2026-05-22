@@ -464,4 +464,21 @@ window.addEventListener("message", function (e) {
           : circleRadius + "m";
     if (activeCircle) activeCircle.setRadius(circleRadius);
   }
+
+  // Pan map to searched location
+  if (e.data && e.data.type === "PAN_TO") {
+    map.setView([e.data.lat, e.data.lng], 15);
+  }
+
+  // Place circle at searched location
+  if (e.data && e.data.type === "PLACE_CIRCLE") {
+    if (activeCircle) map.removeLayer(activeCircle);
+    activeCircle = L.circle([e.data.lat, e.data.lng], {
+      radius: circleRadius,
+      color: "#1977f1",
+      weight: 2,
+      fillColor: "#286cc5",
+      fillOpacity: 0.3,
+    }).addTo(map);
+  }
 });

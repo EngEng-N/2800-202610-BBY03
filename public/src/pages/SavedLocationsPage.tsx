@@ -62,7 +62,6 @@ export default function SavedLocationsPage() {
     try {
       const res = await fetch(`/api/saved-locations/${id}`, {
         method: "DELETE",
-        credentials: "include",
       });
       if (!res.ok) {
         setError("Could not delete.");
